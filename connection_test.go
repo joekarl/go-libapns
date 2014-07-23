@@ -156,8 +156,11 @@ func (conn MockConnErrorOnToken) Read(b []byte) (n int, err error) {
 }
 func (conn MockConnErrorOnToken) Write(b []byte) (n int, err error) {
     conn.WrittenBytes.Write(b)
-    dataSize := binary.BigEndian.Uint16(b[1:3])
-    idStart := 3 + uint64(dataSize) - 4 - 4 - 1
+    frameDataSize := binary.BigEndian.Uint32(b[1:5])
+    fmt.Printf("FrameDataSize %v\n", frameDataSize)
+    frameDataStart := uint64(5)
+    firstItemSize := binary.BigEndian.Uint16(b[frameDataStart + 1:frameDataStart + 3])
+    idStart := frameDataStart + 3 + uint64(firstItemSize) - 4 - 4 - 1
     errorId := binary.BigEndian.Uint32(b[idStart:idStart + 4])
     defer func(){conn.CloseChannel <- errorId}()
     return len(b), nil
@@ -229,13 +232,19 @@ func (conn MockConnErrorOnToken2) Read(b []byte) (n int, err error) {
 }
 func (conn MockConnErrorOnToken2) Write(b []byte) (n int, err error) {
     conn.WrittenBytes.Write(b)
-    dataSize := binary.BigEndian.Uint16(b[1:3])
-    idStart := 3 + uint64(dataSize) - 4 - 4 - 1
-    id := binary.BigEndian.Uint32(b[idStart:idStart + 4])
-    //after #4 written, say an error happened on id 2
-    if id == 4 {
-        defer func(){conn.CloseChannel <- 2}()
-    }
+    frameDataSize := binary.BigEndian.Uint32(b[1:5])
+    fmt.Printf("FrameBytes %v\n", b)
+    fmt.Printf("FrameDataSize %v\n", frameDataSize)
+    frameDataStart := uint64(5)
+    firstItemSize := binary.BigEndian.Uint16(b[frameDataStart + 1:frameDataStart + 3])
+    secondItemStart := frameDataStart + 3 + uint64(firstItemSize)
+    secondItemSize := binary.BigEndian.Uint16(b[secondItemStart + 1:secondItemStart + 3])
+    idStart := secondItemStart + 3 + uint64(secondItemSize) - 4 - 4 - 1
+    fmt.Printf("1 start: %v size: %v, 2 start: %v size: %v\n", frameDataStart, firstItemSize, secondItemStart, secondItemSize)
+    fmt.Printf("second bytes %v\n", b[secondItemStart:secondItemStart + uint64(secondItemSize) + 3])
+    errorId := binary.BigEndian.Uint32(b[idStart:idStart + 4])
+    fmt.Printf("errorId %v\n", errorId)
+    defer func(){conn.CloseChannel <- errorId}()
     return len(b), nil
 }
 func (conn MockConnErrorOnToken2) Close() error {
@@ -495,100 +504,3 @@ func TestConnectionShouldCloseAndReturnUnsentUpToBufferSizeOnAppleResponse(t *te
 
     <- syncChan
 }
-
-
-/**
- * Miscellaneous functionality tests
- */
-type MockConnErrorOnTokenT1 struct {
-     WrittenBytes    *bytes.Buffer
-     CloseChannel    chan uint32
-}
-func (conn MockConnErrorOnTokenT1) Read(b []byte) (n int, err error) {
-    errorId := <- conn.CloseChannel
-    b[0] = uint8(8) //command
-    b[1] = uint8(8) //invalid token
-    //write error id in big endian
-    b[2] = byte(errorId >> 24)
-    b[3] = byte(errorId >> 16)
-    b[4] = byte(errorId >> 8)
-    b[5] = byte(errorId)
-    return 6, nil
-}
-func (conn MockConnErrorOnTokenT1) Write(b []byte) (n int, err error) {
-    conn.WrittenBytes.Write(b)
-    dataSize := binary.BigEndian.Uint16(b[1:3])
-    idStart := 3 + uint64(dataSize) - 4 - 4 - 1
-    errorId := binary.BigEndian.Uint32(b[idStart:idStart + 4])
-    defer func(){conn.CloseChannel <- errorId}()
-    return len(b), nil
-}
-func (conn MockConnErrorOnTokenT1) Close() error {
-    return nil
-}
-func (conn MockConnErrorOnTokenT1) LocalAddr() net.Addr {
-    return nil
-}
-func (conn MockConnErrorOnTokenT1) RemoteAddr() net.Addr {
-    return nil
-}
-func (conn MockConnErrorOnTokenT1) SetDeadline(t time.Time) error {
-    return nil
-}
-func (conn MockConnErrorOnTokenT1) SetReadDeadline(t time.Time) error {
-    return nil
-}
-func (conn MockConnErrorOnTokenT1) SetWriteDeadline(t time.Time) error {
-    return nil
-}
-type ExtraData struct {
-    I      int64
-    F      float64
-}
-
-func TestConnectionShouldAllowExtraDataInPayload(t *testing.T) {
-    socket := MockConnErrorOnTokenT1{
-        WrittenBytes: new(bytes.Buffer),
-        CloseChannel: make(chan uint32),
-    }
-
-    apn := socketAPNSConnection(socket)
-
-
-    token := "4ec500020d8350072d2417ba566feda10b2b266558371a65ba67fede21393c8f"
-    i := int64(25)
-    f := float64(23.0982342374)
-
-    payload := &Payload {
-        AlertText: "Testing",
-        Token: token,
-        ExtraData: &ExtraData{
-            I:i,
-            F:f,
-        },
-    }
-
-    apn.SendChannel <- payload
-
-    connectionClose := <- apn.CloseChannel
-
-    if connectionClose.Error.ErrorCode != 8 {
-        fmt.Printf("Should have received error 8 for closed socket be received %v\n", connectionClose.Error)
-        t.FailNow()
-    }
-
-    errorPayload := connectionClose.ErrorPayload
-
-    if errorPayload == nil ||
-        errorPayload.Token != token {
-        fmt.Printf("Should have returned payload object but received %v\n", connectionClose.ErrorPayload)
-        t.FailNow()
-    }
-
-    if errorPayload.ExtraData != nil && (errorPayload.ExtraData.(*ExtraData).I != i ||
-        errorPayload.ExtraData.(*ExtraData).F != f) {
-        fmt.Printf("Should have returned extra payload object but returned %v\n", connectionClose.ErrorPayload)
-        t.FailNow()
-    }
-
- }
