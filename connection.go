@@ -7,13 +7,13 @@ import (
     "encoding/hex"
     "fmt"
     "net"
-    "time"
 )
 
 type ConnectionClose struct {
-    UnsentPayloads  *list.List
-    Error           *AppleError
-    ErrorPayload    *Payload
+    UnsentPayloads                  *list.List
+    Error                           *AppleError
+    ErrorPayload                    *Payload
+    UnsentPayloadBufferOverflow     bool
 }
 
 type AppleError struct {
@@ -30,6 +30,7 @@ type APNSConnection struct {
     //oldest payload is last
     sentPayloadBuffer   *list.List
     sentBufferSize      int
+    payloadIdCounter    uint32
 }
 
 type idPayload struct {
@@ -53,19 +54,13 @@ var APPLE_PUSH_RESPONSES = map[uint8]string{
     255: "UNKNOWN",
 }
 
-var PAYLOAD_ID uint32 = 0;
-
-func nextPayloadId() uint32 {
-    PAYLOAD_ID++
-    if PAYLOAD_ID == 0 {
-        PAYLOAD_ID = 1
-    }
-    return PAYLOAD_ID
+func socketAPNSConnection(socket net.Conn) (*APNSConnection) {
+    return socketAPNSConnectionBufSize(socket, 10000)
 }
 
-func NewAPNSConnection(socket net.Conn) (*APNSConnection) {
+func socketAPNSConnectionBufSize(socket net.Conn, bufferSize int) (*APNSConnection) {
     c := new(APNSConnection)
-    c.sentBufferSize = 10000
+    c.sentBufferSize = bufferSize
     c.sentPayloadBuffer = list.New()
     c.socket = socket
     c.SendChannel = make(chan *Payload)
@@ -85,6 +80,7 @@ func (c *APNSConnection) Disconnect() {
 func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
     buffer := make([]byte, 6, 6)
     _, err := c.socket.Read(buffer)
+    fmt.Printf("Close buffer %x\n", buffer)
     if err != nil {
         errCloseChannel <- &AppleError{
             ErrorCode: 10,
@@ -92,11 +88,11 @@ func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
             MessageId: 0,
         }
     } else {
-        messageId, _ := binary.Varint(buffer[2:])
+        messageId := binary.BigEndian.Uint32(buffer[2:])
         errCloseChannel <- &AppleError{
             ErrorString: APPLE_PUSH_RESPONSES[uint8(buffer[1])],
             ErrorCode: uint8(buffer[1]),
-            MessageId: uint32(messageId),
+            MessageId: messageId,
         }
     }
 }
@@ -110,33 +106,44 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
         }
         select {
         case sendPayload := <-c.SendChannel:
+            if sendPayload == nil {
+                //channel was closed
+                return
+            }
             //do something here...
             fmt.Printf("Adding payload to flush buffer: %v\n", *sendPayload)
             idPayloadObj := &idPayload{
                 Payload: sendPayload,
-                Id: nextPayloadId(),
+                Id: c.nextPayloadId(),
             }
             c.sentPayloadBuffer.PushFront(idPayloadObj)
+            //check to see if we've overrun our buffer
+            //if so, remove one from the buffer
+            if c.sentPayloadBuffer.Len() > c.sentBufferSize {
+                fmt.Printf("Removing %v from buffer because of overflow, buf len %v\n", *c.sentPayloadBuffer.Back().Value.(*idPayload).Payload, c.sentPayloadBuffer.Len())
+                c.sentPayloadBuffer.Remove(c.sentPayloadBuffer.Back())
+            }
 
-            //write to socket
+            //gen buffer before writing to socket
             itemBuffer := new(bytes.Buffer)
             token, err := hex.DecodeString(sendPayload.Token)
             if err != nil {
                 fmt.Printf("Failed to decode token for payload %v\n", sendPayload)
                 c.Disconnect()
-                return
+                break
             }
             payloadBytes, err := sendPayload.marshalAlertBodyPayload(256)
             if err != nil {
                 fmt.Printf("Failed to marshall payload %v : %v\n", sendPayload, err)
                 c.Disconnect()
-                return
+                break
             }
 
-            payloadLength := 32 + len(payloadBytes) + 4 + 4 + 1;
+            //length of token + payload + id + expiretime + priority
+            dataLength := 32 + len(payloadBytes) + 4 + 4 + 1;
 
-            binary.Write(itemBuffer, binary.BigEndian, uint8(i))
-            binary.Write(itemBuffer, binary.BigEndian, uint16(payloadLength))
+            binary.Write(itemBuffer, binary.BigEndian, uint8(1)) //payload identifier == 1
+            binary.Write(itemBuffer, binary.BigEndian, uint16(dataLength))
             binary.Write(itemBuffer, binary.BigEndian, token)
             binary.Write(itemBuffer, binary.BigEndian, payloadBytes)
             binary.Write(itemBuffer, binary.BigEndian, idPayloadObj.Id)
@@ -146,53 +153,51 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
             }
             binary.Write(itemBuffer, binary.BigEndian, sendPayload.Priority)
 
-            _, err := c.socket.Write(itemBuffer.Bytes())
-            if err != nil {
-                fmt.Printf("Error while writing to socket \n%v\n", err)
+            _, writeErr := c.socket.Write(itemBuffer.Bytes())
+            if writeErr != nil {
+                fmt.Printf("Error while writing to socket \n%v\n", writeErr)
                 c.Disconnect()
+                break
             }
 
-            //check to see if we've overrun our buffer
-            //if so, remove one from the buffer
-            if c.sentPayloadBuffer.Len() > c.sentBufferSize {
-                c.sentPayloadBuffer.Remove(c.sentPayloadBuffer.Back())
-            }
             break
         case appleError = <- errCloseChannel:
             break
         }
     }
 
+    //gather unsent payload objs
     unsentPayloads := list.New()
-    sentPayloadBufferCopy := list.New()
-    sentPayloadBufferCopy.PushBackList(c.sentPayloadBuffer)
     var errorPayload *Payload
-    for e := c.sentPayloadBuffer.Back(); e != nil; e = e.Prev() {
+    for e := c.sentPayloadBuffer.Front(); e != nil; e = e.Next(){
         idPayloadObj := e.Value.(*idPayload)
-        c.sentPayloadBuffer.Remove(e)
-        if idPayloadObj.Id == appleError.MessageId {
+        if appleError.MessageId != 0 && idPayloadObj.Id == appleError.MessageId {
+            //found error payload, keep track of it and remove from send buffer
             errorPayload = idPayloadObj.Payload
             break
         }
+        unsentPayloads.PushFront(idPayloadObj.Payload)
     }
 
-    if errorPayload != nil {
-        //dump the rest of the payload buffer into the 
-        //unset payloads list
-        unsentPayloads.PushBackList(c.sentPayloadBuffer)
-    } else {
-        //we couldn't find the error payload...
-        //but we can assume that the rest of payloads 
-        //were unsent because in this case we overran our buffer
-        //and the error payload doesn't exist anymore
-        unsentPayloads.PushBackList(sentPayloadBufferCopy)
-    }
+    //connection close channel write and close
+    go func() {
+        c.CloseChannel <- &ConnectionClose{
+            Error: appleError,
+            UnsentPayloads: unsentPayloads,
+            ErrorPayload: errorPayload,
+            UnsentPayloadBufferOverflow: (unsentPayloads.Len() > 0 && errorPayload == nil),
+        }
 
-    c.CloseChannel <- &ConnectionClose{
-        Error: appleError,
-        UnsentPayloads: unsentPayloads,
-        ErrorPayload: errorPayload,
-    }
+        close(c.CloseChannel)
+    }()
 
-    close(c.CloseChannel)
+    fmt.Printf("Finished listening for payloads\n")
+}
+
+func (c *APNSConnection) nextPayloadId() uint32 {
+    c.payloadIdCounter++
+    if c.payloadIdCounter == 0 {
+        c.payloadIdCounter = 1
+    }
+    return c.payloadIdCounter
 }

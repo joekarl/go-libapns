@@ -19,6 +19,7 @@ type Payload struct {
     Priority             uint8
     Sound                string
     Token                string
+    ExtraData            interface{}
 }
 
 type apsAlertBody struct {
