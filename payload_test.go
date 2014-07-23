@@ -1,4 +1,4 @@
-package main
+package apns
 
 import (
     "fmt"
@@ -25,7 +25,7 @@ func TestSimpleMarshal(t *testing.T) {
     }
 
     expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -61,7 +61,7 @@ func TestSimpleMarshalWithCustomFields(t *testing.T) {
     }
 
     expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1},\"arr\":[\"a\",2],\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -88,7 +88,7 @@ func TestSimpleMarshalTruncate(t *testing.T) {
     }
 
     expectedJson := "{\"aps\":{\"alert\":\"Testing this payload with a really long message that should cause the payload to be truncated yay and stuff blah blah blah blah blah blah and some more text to really make this much...\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -128,7 +128,7 @@ func TestSimpleMarshalTruncateWithCustomFields(t *testing.T) {
     expectedJson := "{\"aps\":{\"alert\":\"Testing this payload with a bunch of text that should get truncated " +
                     "so truncate this already please yes thank you...\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1},"+
                     "\"arr\":[\"a\",2],\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -201,7 +201,7 @@ func TestAlertBodyMarshal(t *testing.T) {
     }
 
     expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\",\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -244,7 +244,7 @@ func TestAlertBodyMarshalWithCustomFields(t *testing.T) {
         "\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1},\"arr\":[\"a\",2]," +
         "\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
 
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -272,7 +272,7 @@ func TestAlertBodyMarshalTruncate(t *testing.T) {
     }
 
     expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload with a really long message that should cause the payload to be truncated yay and stuff blah blah blah blah blah blah and so...\",\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }
@@ -313,7 +313,7 @@ func TestAlertBodyMarshalTruncateWithCustomFields(t *testing.T) {
     expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this ...\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\"," +
                     "\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1},"+
                     "\"arr\":[\"a\",2],\"arr2\":[\"a\",2],\"num\":55,\"str\":\"string\"}"
-    if json != expectedJson {
+    if string(json) != expectedJson {
         t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
     }
 }

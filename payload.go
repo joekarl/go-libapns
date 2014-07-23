@@ -1,4 +1,4 @@
-package main
+package apns
 
 import (
     "encoding/json"
@@ -7,15 +7,18 @@ import (
 )
 
 type Payload struct {
+    ActionLocKey         string
     AlertText            string
     Badge                int
-    Sound                string
     ContentAvailable     int
-    ActionLocKey         string
-    LocKey               string
-    LocArgs              []string
-    LaunchImage          string
     CustomFields         map[string]interface{}
+    ExpirationTime       uint32
+    LaunchImage          string
+    LocArgs              []string
+    LocKey               string
+    Priority             uint8
+    Sound                string
+    Token                string
 }
 
 type apsAlertBody struct {
@@ -40,7 +43,7 @@ type simpleAps struct {
     ContentAvailable     int        `json:"content-available,omitempty"`
 }
 
-func (p *Payload) Marshal(maxPayloadSize int) (string, error) {
+func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
     // found in https://github.com/anachronistic/apns/blob/master/push_notification.go#L93
     // This deserves some explanation.
 	//
@@ -82,7 +85,7 @@ func constructFullPayload(aps interface{}, customFields map[string]interface{}) 
     return fullPayload, nil
 }
 
-func (p *Payload) marshalSimplePayload(maxPayloadSize int) (string, error) {
+func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
     var jsonStr []byte = nil
 
     //use simple payload
@@ -95,12 +98,12 @@ func (p *Payload) marshalSimplePayload(maxPayloadSize int) (string, error) {
 
     fullPayload, err := constructFullPayload(aps, p.CustomFields)
     if (err != nil) {
-        return "", err
+        return nil, err
     }
 
     jsonStr, err = json.Marshal(fullPayload)
     if (err != nil) {
-        return "", err
+        return nil, err
     }
 
     payloadLen := len(jsonStr)
@@ -108,24 +111,24 @@ func (p *Payload) marshalSimplePayload(maxPayloadSize int) (string, error) {
     if payloadLen > maxPayloadSize {
         clipSize := payloadLen - (maxPayloadSize) + 3 //need extra characters for ellipse
         if clipSize > len(p.AlertText) {
-            return "", errors.New(fmt.Sprintf("Payload was too long to successfully marshall to less than %v", maxPayloadSize))
+            return nil, errors.New(fmt.Sprintf("Payload was too long to successfully marshall to less than %v", maxPayloadSize))
         }
         aps.Alert = aps.Alert[:len(aps.Alert) - clipSize] + "..."
         fullPayload["aps"] = aps
         if (err != nil) {
-            return "", err
+            return nil, err
         }
 
         jsonStr, err = json.Marshal(fullPayload)
         if (err != nil) {
-            return "", err
+            return nil, err
         }
     }
 
-    return string(jsonStr), nil
+    return jsonStr, nil
 }
 
-func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) (string, error) {
+func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
     var jsonStr []byte = nil
 
     //use alertBody payload
@@ -146,12 +149,12 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) (string, error) {
 
     fullPayload, err := constructFullPayload(aps, p.CustomFields)
     if (err != nil) {
-        return "", err
+        return nil, err
     }
 
     jsonStr, err = json.Marshal(fullPayload)
     if (err != nil) {
-        return "", err
+        return nil, err
     }
 
     payloadLen := len(jsonStr)
@@ -159,19 +162,19 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) (string, error) {
     if payloadLen > maxPayloadSize {
         clipSize := payloadLen - (maxPayloadSize) + 3 //need extra characters for ellipse
         if clipSize > len(p.AlertText) {
-            return "", errors.New(fmt.Sprintf("Payload was too long to successfully marshall to less than %v", maxPayloadSize))
+            return nil, errors.New(fmt.Sprintf("Payload was too long to successfully marshall to less than %v", maxPayloadSize))
         }
         aps.Alert.Body = aps.Alert.Body[:len(aps.Alert.Body) - clipSize] + "..."
         fullPayload["aps"] = aps
         if (err != nil) {
-            return "", err
+            return nil, err
         }
 
         jsonStr, err = json.Marshal(fullPayload)
         if (err != nil) {
-            return "", err
+            return nil, err
         }
     }
 
-    return string(jsonStr), nil
+    return jsonStr, nil
 }
