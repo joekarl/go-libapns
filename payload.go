@@ -32,8 +32,8 @@ type apsAlertBody struct {
 
 type alertBodyAps struct {
     Alert                apsAlertBody `json:"alert,omitempty"`
-	Badge                int          `json:"badge,omitempty"`
-	Sound                string       `json:"sound,omitempty"`
+    Badge                int          `json:"badge,omitempty"`
+    Sound                string       `json:"sound,omitempty"`
     ContentAvailable     int          `json:"content-available,omitempty"`
 }
 
@@ -47,21 +47,21 @@ type simpleAps struct {
 func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
     // found in https://github.com/anachronistic/apns/blob/master/push_notification.go#L93
     // This deserves some explanation.
-	//
-	// Setting an exported field of type int to 0
-	// triggers the omitempty behavior if you've set it.
-	// Since the badge is optional, we should omit it if
-	// it's not set. However, we want to include it if the
-	// value is 0, so there's a hack in payload.go
-	// that exploits the fact that Apple treats -1 for a
-	// badge value as though it were 0 (i.e. it clears the
-	// badge but doesn't stop the notification from going
-	// through successfully.)
-	//
-	// Still a hack though :)
-	if p.Badge == 0 {
-		p.Badge = -1
-	}
+    //
+    // Setting an exported field of type int to 0
+    // triggers the omitempty behavior if you've set it.
+    // Since the badge is optional, we should omit it if
+    // it's not set. However, we want to include it if the
+    // value is 0, so there's a hack in payload.go
+    // that exploits the fact that Apple treats -1 for a
+    // badge value as though it were 0 (i.e. it clears the
+    // badge but doesn't stop the notification from going
+    // through successfully.)
+    //
+    // Still a hack though :)
+    if p.Badge == 0 {
+        p.Badge = -1
+    }
     if p.isSimple() {
         return p.marshalSimplePayload(maxPayloadSize)
     } else {
