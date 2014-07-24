@@ -30,12 +30,16 @@ type APNSConnection struct {
     CloseChannel        chan *ConnectionClose
     //buffered list of sent push notifications
     //oldest payload is last
-    sentPayloadBuffer   *list.List
-    sentBufferSize      int
-    payloadIdCounter    uint32
-    inFlightBuffer      *bytes.Buffer
-    inFlightId          uint8
-    inFlightBufferLock  *sync.Mutex
+    inFlightPayloadBuffer           *list.List
+    inFlightPayloadBufferSize       int
+    inFlightByteBuffer              *bytes.Buffer
+    inFlightId                      uint8
+    inFlightBufferLock              *sync.Mutex
+    payloadIdCounter                uint32
+}
+
+type APNSConnectionConfig struct {
+
 }
 
 type idPayload struct {
@@ -73,12 +77,12 @@ func socketAPNSConnection(socket net.Conn) (*APNSConnection) {
 
 func socketAPNSConnectionBufSize(socket net.Conn, bufferSize int) (*APNSConnection) {
     c := new(APNSConnection)
-    c.sentBufferSize = bufferSize
-    c.sentPayloadBuffer = list.New()
+    c.inFlightPayloadBufferSize = bufferSize
+    c.inFlightPayloadBuffer = list.New()
     c.socket = socket
     c.SendChannel = make(chan *Payload)
     c.CloseChannel = make(chan *ConnectionClose)
-    c.inFlightBuffer = new(bytes.Buffer)
+    c.inFlightByteBuffer = new(bytes.Buffer)
     c.inFlightId = 0
     c.inFlightBufferLock = new(sync.Mutex)
     errCloseChannel := make(chan *AppleError)
@@ -91,7 +95,9 @@ func socketAPNSConnectionBufSize(socket net.Conn, bufferSize int) (*APNSConnecti
 
 func (c *APNSConnection) Disconnect() {
     //flush on disconnect
+    c.inFlightBufferLock.Lock()
     c.flushBufferToSocket()
+    c.inFlightBufferLock.Unlock()
     c.noFlushDisconnect()
 }
 
@@ -142,12 +148,12 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
                 Payload: sendPayload,
                 Id: c.nextPayloadId(),
             }
-            c.sentPayloadBuffer.PushFront(idPayloadObj)
+            c.inFlightPayloadBuffer.PushFront(idPayloadObj)
             //check to see if we've overrun our buffer
             //if so, remove one from the buffer
-            if c.sentPayloadBuffer.Len() > c.sentBufferSize {
-                //fmt.Printf("Removing %v from buffer because of overflow, buf len %v\n", *c.sentPayloadBuffer.Back().Value.(*idPayload).Payload, c.sentPayloadBuffer.Len())
-                c.sentPayloadBuffer.Remove(c.sentPayloadBuffer.Back())
+            if c.inFlightPayloadBuffer.Len() > c.inFlightPayloadBufferSize {
+                //fmt.Printf("Removing %v from buffer because of overflow, buf len %v\n", *c.inFlightPayloadBuffer.Back().Value.(*idPayload).Payload, c.inFlightPayloadBuffer.Len())
+                c.inFlightPayloadBuffer.Remove(c.inFlightPayloadBuffer.Back())
             }
 
             c.bufferPayload(idPayloadObj)
@@ -168,7 +174,7 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
     //gather unsent payload objs
     unsentPayloads := list.New()
     var errorPayload *Payload
-    for e := c.sentPayloadBuffer.Front(); e != nil; e = e.Next(){
+    for e := c.inFlightPayloadBuffer.Front(); e != nil; e = e.Next(){
         idPayloadObj := e.Value.(*idPayload)
         if appleError.MessageId != 0 && idPayloadObj.Id == appleError.MessageId {
             //found error payload, keep track of it and remove from send buffer
@@ -194,13 +200,12 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 }
 
 /**
- * NOT THREADSAFE (but only called from the threadsafe send listener so okay? o_0)
+ * THREADSAFE (with regard to interaction with the inFlightByteBuffer)
  */
 func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
 
     //gen itembuffer
     itemBuffer := new(bytes.Buffer)
-    c.inFlightId++
     token, err := hex.DecodeString(idPayloadObj.Payload.Token)
     if err != nil {
         fmt.Printf("Failed to decode token for payload %v\n", idPayloadObj.Payload)
@@ -217,7 +222,7 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
     //length of token + payload + id + expiretime + priority
     dataLength := 32 + len(payloadBytes) + 4 + 4 + 1;
 
-    binary.Write(itemBuffer, binary.BigEndian, uint8(c.inFlightId)) //payload identifier == 1
+    binary.Write(itemBuffer, binary.BigEndian, uint8(0)) //placeholder...
     binary.Write(itemBuffer, binary.BigEndian, uint16(dataLength))
     binary.Write(itemBuffer, binary.BigEndian, token)
     binary.Write(itemBuffer, binary.BigEndian, payloadBytes)
@@ -228,47 +233,46 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
     }
     binary.Write(itemBuffer, binary.BigEndian, idPayloadObj.Payload.Priority)
 
-    var bufferLocked = false
+    //acquire lock to tcp buffer to do length checking, update inFlightId,
+    //and potentially flush buffer
+    c.inFlightBufferLock.Lock()
 
-    //check to see if we should flush inFlightBuffer
-    if c.inFlightBuffer.Len() + itemBuffer.Len() > TCP_FRAME_MAX ||
-        c.inFlightBuffer.Len() == 0 {
-        if c.inFlightBuffer.Len() + itemBuffer.Len() > TCP_FRAME_MAX {
+    //check to see if we should flush inFlightTCPBuffer
+    if c.inFlightByteBuffer.Len() + itemBuffer.Len() > TCP_FRAME_MAX ||
+        c.inFlightByteBuffer.Len() == 0 {
+        if c.inFlightByteBuffer.Len() + itemBuffer.Len() > TCP_FRAME_MAX {
             c.flushBufferToSocket()
-            c.inFlightBufferLock.Lock()
-            bufferLocked = true
-            c.inFlightBuffer = new(bytes.Buffer)
+            c.inFlightByteBuffer.Reset()
         }
 
         //write buffer header
-        if !bufferLocked {
-            c.inFlightBufferLock.Lock()
-            bufferLocked = true
-        }
-        binary.Write(c.inFlightBuffer, binary.BigEndian, uint8(2))
-        binary.Write(c.inFlightBuffer, binary.BigEndian, uint32(0))
+        binary.Write(c.inFlightByteBuffer, binary.BigEndian, uint8(2))
+        binary.Write(c.inFlightByteBuffer, binary.BigEndian, uint32(0))
+        c.inFlightId = 0
+    } else {
+        c.inFlightId++
     }
 
-    if !bufferLocked {
-        c.inFlightBufferLock.Lock()
-        bufferLocked = true
-    }
-    itemBuffer.WriteTo(c.inFlightBuffer)
+    itemBytes := itemBuffer.Bytes()
+    itemBytes[0] = c.inFlightId
+
+    c.inFlightByteBuffer.Write(itemBytes)
+
+    //unlock byte buffer when finished writing to it
     c.inFlightBufferLock.Unlock()
 }
 
 /**
- * THREADSAFE (needs to be as can be flushed via sendlistener or disconnect)
+ * NOT THREADSAFE (need to acquire inFlightBufferLock before calling)
  */
 func (c *APNSConnection) flushBufferToSocket() {
-    c.inFlightBufferLock.Lock()
     //if buffer not created, or zero length, or just has header information written
     //do nothing
-    if c.inFlightBuffer == nil || c.inFlightBuffer.Len() == 0 || c.inFlightBuffer.Len() == 5 {
+    if c.inFlightByteBuffer == nil || c.inFlightByteBuffer.Len() == 0 || c.inFlightByteBuffer.Len() == 5 {
         return
     }
 
-    bufBytes := c.inFlightBuffer.Bytes()
+    bufBytes := c.inFlightByteBuffer.Bytes()
 
     //fill in frame length
     frameLength := len(bufBytes) - 5 //full length minus header info
@@ -285,8 +289,6 @@ func (c *APNSConnection) flushBufferToSocket() {
         fmt.Printf("Error while writing to socket \n%v\n", writeErr)
         defer c.noFlushDisconnect()
     }
-
-    c.inFlightBufferLock.Unlock()
 }
 
 func (c *APNSConnection) nextPayloadId() uint32 {
