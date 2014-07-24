@@ -156,13 +156,7 @@ func (conn MockConnErrorOnToken) Read(b []byte) (n int, err error) {
 }
 func (conn MockConnErrorOnToken) Write(b []byte) (n int, err error) {
     conn.WrittenBytes.Write(b)
-    frameDataSize := binary.BigEndian.Uint32(b[1:5])
-    fmt.Printf("FrameDataSize %v\n", frameDataSize)
-    frameDataStart := uint64(5)
-    firstItemSize := binary.BigEndian.Uint16(b[frameDataStart + 1:frameDataStart + 3])
-    idStart := frameDataStart + 3 + uint64(firstItemSize) - 4 - 4 - 1
-    errorId := binary.BigEndian.Uint32(b[idStart:idStart + 4])
-    defer func(){conn.CloseChannel <- errorId}()
+    defer func(){conn.CloseChannel <- 0}()
     return len(b), nil
 }
 func (conn MockConnErrorOnToken) Close() error {
@@ -232,19 +226,7 @@ func (conn MockConnErrorOnToken2) Read(b []byte) (n int, err error) {
 }
 func (conn MockConnErrorOnToken2) Write(b []byte) (n int, err error) {
     conn.WrittenBytes.Write(b)
-    frameDataSize := binary.BigEndian.Uint32(b[1:5])
-    fmt.Printf("FrameBytes %v\n", b)
-    fmt.Printf("FrameDataSize %v\n", frameDataSize)
-    frameDataStart := uint64(5)
-    firstItemSize := binary.BigEndian.Uint16(b[frameDataStart + 1:frameDataStart + 3])
-    secondItemStart := frameDataStart + 3 + uint64(firstItemSize)
-    secondItemSize := binary.BigEndian.Uint16(b[secondItemStart + 1:secondItemStart + 3])
-    idStart := secondItemStart + 3 + uint64(secondItemSize) - 4 - 4 - 1
-    fmt.Printf("1 start: %v size: %v, 2 start: %v size: %v\n", frameDataStart, firstItemSize, secondItemStart, secondItemSize)
-    fmt.Printf("second bytes %v\n", b[secondItemStart:secondItemStart + uint64(secondItemSize) + 3])
-    errorId := binary.BigEndian.Uint32(b[idStart:idStart + 4])
-    fmt.Printf("errorId %v\n", errorId)
-    defer func(){conn.CloseChannel <- errorId}()
+    defer func(){conn.CloseChannel <- 1}()
     return len(b), nil
 }
 func (conn MockConnErrorOnToken2) Close() error {
