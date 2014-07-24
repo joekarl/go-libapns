@@ -61,6 +61,10 @@ var APPLE_PUSH_RESPONSES = map[uint8]string{
     255: "UNKNOWN",
 }
 
+func NewAPNSConnection(socket net.Conn) (*APNSConnection) {
+    return socketAPNSConnection(socket)
+}
+
 func socketAPNSConnection(socket net.Conn) (*APNSConnection) {
     return socketAPNSConnectionBufSize(socket, 10000)
 }
@@ -89,7 +93,7 @@ func (c *APNSConnection) Disconnect() {
 func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
     buffer := make([]byte, 6, 6)
     _, err := c.socket.Read(buffer)
-    fmt.Printf("Close buffer %x\n", buffer)
+    //fmt.Printf("Close buffer %x\n", buffer)
     if err != nil {
         errCloseChannel <- &AppleError{
             ErrorCode: 10,
@@ -124,7 +128,7 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
                 return
             }
             //do something here...
-            fmt.Printf("Adding payload to flush buffer: %v\n", *sendPayload)
+            //fmt.Printf("Adding payload to flush buffer: %v\n", *sendPayload)
             idPayloadObj := &idPayload{
                 Payload: sendPayload,
                 Id: c.nextPayloadId(),
@@ -133,7 +137,7 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
             //check to see if we've overrun our buffer
             //if so, remove one from the buffer
             if c.sentPayloadBuffer.Len() > c.sentBufferSize {
-                fmt.Printf("Removing %v from buffer because of overflow, buf len %v\n", *c.sentPayloadBuffer.Back().Value.(*idPayload).Payload, c.sentPayloadBuffer.Len())
+                //fmt.Printf("Removing %v from buffer because of overflow, buf len %v\n", *c.sentPayloadBuffer.Back().Value.(*idPayload).Payload, c.sentPayloadBuffer.Len())
                 c.sentPayloadBuffer.Remove(c.sentPayloadBuffer.Back())
             }
 
