@@ -108,7 +108,7 @@ func (c *APNSConnection) noFlushDisconnect() {
 func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
     buffer := make([]byte, 6, 6)
     _, err := c.socket.Read(buffer)
-    //fmt.Printf("Close buffer %x\n", buffer)
+    fmt.Printf("Close buffer %x\n", buffer)
     if err != nil {
         errCloseChannel <- &AppleError{
             ErrorCode: 10,
