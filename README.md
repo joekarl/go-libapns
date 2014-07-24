@@ -39,7 +39,7 @@ func main() {
 **Note** This example doesn't take into account essential error handling or socket creation details. See below for error handling details
 
 ##Error Handling
-As per Apple's guidelines, when a connection is closed due to error, the id of the message which caused the error will be transmitted back over the connection. In this case, multiple push notifications may have followed the bad message. These push notifications will be supplied on a channel **as well as any other unsent messages** and will be then available to re-process.
+As per Apple's guidelines, when a connection is closed due to error, the id of the message which caused the error will be transmitted back over the connection. In this case, multiple push notifications may have followed the bad message. These push notifications will be supplied on a channel **as well as any other unsent messages** and will be then available to re-process. Also when writing to the send channel, you should wrap the send with a select and case both the send and connection close channels. This will allow you to correctly handle the async nature of Apple's error handling scheme.
 
 ```go
 package main
@@ -86,7 +86,7 @@ func main() {
 
         //*apns.AppleError actual apple error information
         sendError.Error
-        
+
         //bool if this is true, then we overflowed our buffer and
         //    some notifications were lost due to error
         sendError.UnsentPayloadBufferOverflow
@@ -103,3 +103,6 @@ Apple places a strict limit on push notification length (currently at 256 bytes)
 
 ##Feedback Service
 Right now there is no implementation of the feedback service in this library, but one is planned.
+
+##What's with using channels for writing to the connection?
+Basically, this makes it easier to synchronize error handling and socket errors. Not sure if this is the best idea, but definitely works.
