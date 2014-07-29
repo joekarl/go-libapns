@@ -9,6 +9,9 @@ Handles the latest Apple push notification guidelines at https://developer.apple
 
 Specifically will implement the binary framed format by batching push notifications. Each batch will be flushed either every 10ms or when a frame is full. A frame is full when the framed format cannot fit anymore data into a tcp packet (65535 bytes). Due to this framing, when finished with the apns connection, one should call Disconnect() to flush any remaining messages out the door.
 
+##Godoc
+Located here [![GoDoc](https://godoc.org/github.com/joekarl/go-libapns?status.svg)](https://godoc.org/github.com/joekarl/go-libapns)
+
 ##Installation
 
 ```bash
