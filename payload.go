@@ -1,3 +1,5 @@
+//Package for creating a connection to Apple's APNS gateway and facilitating 
+//sending push notifications via that gateway
 package apns
 
 import (
@@ -6,6 +8,7 @@ import (
 	"fmt"
 )
 
+//Object describing a push notification payload
 type Payload struct {
 	ActionLocKey string
 	//alert text, may be truncated if bigger than max payload size
@@ -89,7 +92,7 @@ func (p *Payload) isSimple() bool {
 //Helper method to generate a json compatible map with aps key + custom fields
 //will return error if custom field named aps supplied
 func constructFullPayload(aps interface{}, customFields map[string]interface{}) (map[string]interface{}, error) {
-	var fullPayload map[string]interface{} = make(map[string]interface{})
+	var fullPayload = make(map[string]interface{})
 	fullPayload["aps"] = aps
 	for key, value := range customFields {
 		if key == "aps" {
@@ -103,7 +106,7 @@ func constructFullPayload(aps interface{}, customFields map[string]interface{}) 
 //Handle simple payload case with just text alert
 //Handle truncating of alert text if too long for maxPayloadSize
 func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
-	var jsonStr []byte = nil
+	var jsonStr []byte
 
 	//use simple payload
 	aps := simpleAps{
@@ -148,7 +151,7 @@ func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
 //Handle complet payload case with alert object
 //Handle truncating of alert text if too long for maxPayloadSize
 func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
-	var jsonStr []byte = nil
+	var jsonStr []byte
 
 	//use alertBody payload
 	alertBody := apsAlertBody{

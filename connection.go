@@ -1,3 +1,5 @@
+//Package for creating a connection to Apple's APNS gateway and facilitating 
+//sending push notifications via that gateway
 package apns
 
 import (
@@ -13,6 +15,7 @@ import (
 	"time"
 )
 
+//Config for creating an APNS Connection
 type APNSConfig struct {
 	//number of payloads to keep for error purposes, defaults to 10000
 	InFlightPayloadBufferSize int
@@ -33,6 +36,7 @@ type APNSConfig struct {
 	MaxOutboundTCPFrameSize int
 }
 
+//Object returned on a connection close or connection error
 type ConnectionClose struct {
 	//Any payload objects that weren't sent after a connection close
 	UnsentPayloads *list.List
@@ -44,15 +48,17 @@ type ConnectionClose struct {
 	UnsentPayloadBufferOverflow bool
 }
 
+//Details from Apple regarding a connection close
 type AppleError struct {
 	//Internal ID of the message that caused the error
-	MessageId uint32
+	MessageID uint32
 	//Error code returned by Apple (see APPLE_PUSH_RESPONSES)
 	ErrorCode uint8
 	//String name of error code
 	ErrorString string
 }
 
+//APNS Connection state
 type APNSConnection struct {
 	//Channel to send payloads on
 	SendChannel chan *Payload
@@ -79,7 +85,7 @@ type idPayload struct {
 	//The Payload object
 	Payload *Payload
 	//The numerical id (from payloadIdCounter) for replay identification
-	Id uint32
+	ID uint32
 }
 
 const (
@@ -219,14 +225,14 @@ func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
 		errCloseChannel <- &AppleError{
 			ErrorCode:   10,
 			ErrorString: err.Error(),
-			MessageId:   0,
+			MessageID:   0,
 		}
 	} else {
 		messageId := binary.BigEndian.Uint32(buffer[2:])
 		errCloseChannel <- &AppleError{
 			ErrorString: APPLE_PUSH_RESPONSES[uint8(buffer[1])],
 			ErrorCode:   uint8(buffer[1]),
-			MessageId:   messageId,
+			MessageID:   messageId,
 		}
 	}
 }
@@ -252,7 +258,7 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 			}
 			idPayloadObj := &idPayload{
 				Payload: sendPayload,
-				Id:      c.payloadIdCounter,
+				ID:      c.payloadIdCounter,
 			}
 			c.payloadIdCounter++
 			c.inFlightPayloadBuffer.PushFront(idPayloadObj)
@@ -293,7 +299,7 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 	if appleError.ErrorCode != 0 {
 		for e := c.inFlightPayloadBuffer.Front(); e != nil; e = e.Next() {
 			idPayloadObj := e.Value.(*idPayload)
-			if idPayloadObj.Id == appleError.MessageId {
+			if idPayloadObj.ID == appleError.MessageID {
 				//found error payload, keep track of it and remove from send buffer
 				errorPayload = idPayloadObj.Payload
 				break
@@ -348,7 +354,7 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
 	//write id
 	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, uint8(3))
 	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, uint16(4))
-	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, idPayloadObj.Id)
+	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, idPayloadObj.ID)
 
 	//write expire date if set
 	if idPayloadObj.Payload.ExpirationTime != 0 {
