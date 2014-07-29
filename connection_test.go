@@ -51,7 +51,13 @@ func TestConnectionShouldCloseOnWriteError(t *testing.T) {
         CloseChannel: make(chan bool),
     }
 
-    apn := socketAPNSConnection(socket)
+    apn := socketAPNSConnection(socket, 
+        &APNSConfig{
+            InFlightPayloadBufferSize: 10000,
+            FramingTimeout: 10,
+            MaxOutboundTCPFrameSize: TCP_FRAME_MAX,
+            MaxPayloadSize: 256,
+        })
 
     payload := &Payload {
         AlertText: "Testing",
@@ -114,7 +120,13 @@ func TestConnectionShouldCloseOnReadError(t *testing.T) {
             CloseChannel: make(chan bool),
         }
 
-        apn := socketAPNSConnection(socket)
+        apn := socketAPNSConnection(socket, 
+            &APNSConfig{
+                InFlightPayloadBufferSize: 10000,
+                FramingTimeout: 10,
+                MaxOutboundTCPFrameSize: TCP_FRAME_MAX,
+                MaxPayloadSize: 256,
+            })
 
         for {
             select {
@@ -184,7 +196,13 @@ func TestConnectionShouldCloseOnAppleResponse(t *testing.T) {
         CloseChannel: make(chan uint32),
     }
 
-    apn := socketAPNSConnection(socket)
+    apn := socketAPNSConnection(socket, 
+        &APNSConfig{
+            InFlightPayloadBufferSize: 10000,
+            FramingTimeout: 10,
+            MaxOutboundTCPFrameSize: TCP_FRAME_MAX,
+            MaxPayloadSize: 256,
+        })
 
     token := "4ec500020d8350072d2417ba566feda10b2b266558371a65ba67fede21393c8f"
 
@@ -289,7 +307,13 @@ func TestConnectionShouldCloseAndReturnUnsentOnAppleResponse(t *testing.T) {
             CloseChannel: make(chan uint32),
         }
 
-        apn := socketAPNSConnection(socket)
+        apn := socketAPNSConnection(socket, 
+            &APNSConfig{
+                InFlightPayloadBufferSize: 10000,
+                FramingTimeout: 10,
+                MaxOutboundTCPFrameSize: TCP_FRAME_MAX,
+                MaxPayloadSize: 256,
+            })
 
         for {
             select {
@@ -432,7 +456,13 @@ func TestConnectionShouldCloseAndReturnUnsentUpToBufferSizeOnAppleResponse(t *te
             CloseChannel: make(chan uint32),
         }
 
-        apn := socketAPNSConnectionBufSize(socket, 1)
+        apn := socketAPNSConnection(socket, 
+            &APNSConfig{
+                InFlightPayloadBufferSize: 1,
+                FramingTimeout: 10,
+                MaxOutboundTCPFrameSize: TCP_FRAME_MAX,
+                MaxPayloadSize: 256,
+            })
 
         for {
             select {

@@ -3,52 +3,65 @@ package apns
 import (
     "bytes"
     "container/list"
+    "crypto/tls"
     "encoding/binary"
     "encoding/hex"
+    "errors"
     "fmt"
     "net"
     "sync"
     "time"
 )
 
+//Config for APNS connection
+type APNSConfig struct {
+    InFlightPayloadBufferSize       int                     //number of payloads to keep for error purposes, defaults to 10000
+    FramingTimeout                  int                     //number of milliseconds between frame flushes, defaults to 10
+    MaxPayloadSize                  int                     //max number of bytes allowed in payload, defaults to 256
+    CertificateBytes                []byte                  //bytes for cert.pem : required
+    KeyBytes                        []byte                  //bytes for key.pem : required
+    GatewayHost                     string                  //apple gateway, defaults to "gateway.push.apple.com"
+    GatewayPort                     string                  //apple gateway port, defaults to "2195"
+    MaxOutboundTCPFrameSize         int                     //max number of bytes to frame data to, defaults to TCP_FRAME_MAX
+                                                            //generally best to NOT set this and use the default
+}
+
+//Object describing the APNS connection close state
 type ConnectionClose struct {
-    UnsentPayloads                  *list.List
-    Error                           *AppleError
-    ErrorPayload                    *Payload
-    UnsentPayloadBufferOverflow     bool
+    UnsentPayloads                  *list.List              //Any payload objects that weren't sent after a connection close
+    Error                           *AppleError             //The error details returned from Apple
+    ErrorPayload                    *Payload                //The payload object that caused the error
+    UnsentPayloadBufferOverflow     bool                    //True if error payload wasn't found indicating some unsent payloads were lost
 }
 
+//Object describing the error details returned from Apple
 type AppleError struct {
-    MessageId       uint32
-    ErrorCode       uint8
-    ErrorString     string
+    MessageId                       uint32                  //Internal ID of the message that caused the error
+    ErrorCode                       uint8                   //Error code returned by Apple (see APPLE_PUSH_RESPONSES)
+    ErrorString                     string                  //String name of error code
 }
 
+//Object describing APNS connection and connection state
 type APNSConnection struct {
-    socket              net.Conn
-    SendChannel         chan *Payload
-    CloseChannel        chan *ConnectionClose
-    //buffered list of sent push notifications
-    //oldest payload is last
-    inFlightPayloadBuffer           *list.List
-    inFlightPayloadBufferSize       int
-    inFlightFrameByteBuffer         *bytes.Buffer
-    inFlightItemByteBuffer          *bytes.Buffer
-    inFlightBufferLock              *sync.Mutex
-    payloadIdCounter                uint32
+    SendChannel                     chan *Payload           //Channel to send payloads on
+    CloseChannel                    chan *ConnectionClose   //Channel that connection close is received on
+    socket                          net.Conn                //raw socket connection
+    config                          *APNSConfig             //config
+    inFlightPayloadBuffer           *list.List              //Buffer to hold payloads for replay
+    inFlightFrameByteBuffer         *bytes.Buffer           //Stateful buffer to hold framed byte data
+    inFlightItemByteBuffer          *bytes.Buffer           //Stateful buffer to hold data while generating item bytes
+    inFlightBufferLock              *sync.Mutex             //Mutex to sync access to Frame byte buffer
+    payloadIdCounter                uint32                  //Stateful counter to identify payloads for replay
 }
 
-type APNSConnectionConfig struct {
-
-}
-
+//Wrapper for associating an ID with a Payload object
 type idPayload struct {
-    Payload         *Payload
-    Id              uint32
+    Payload                         *Payload                //The Payload object
+    Id                              uint32                  //The numerical id (from payloadIdCounter) for replay identification
 }
 
 const (
-    TCP_FRAME_MAX = 65535
+    TCP_FRAME_MAX = 65535 //Max number of bytes in a TCP frame
 )
 
 // This enumerates the response codes that Apple defines
@@ -68,17 +81,82 @@ var APPLE_PUSH_RESPONSES = map[uint8]string{
     255: "UNKNOWN",
 }
 
-func NewAPNSConnection(socket net.Conn) (*APNSConnection) {
-    return socketAPNSConnection(socket)
+//Create a new apns connection with supplied config
+//If invalid config an error will be returned
+//See APNSConfig object for defaults
+func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
+    errorStrs := ""
+
+    if config.CertificateBytes == nil || config.KeyBytes == nil {
+        errorStrs += "Invalid Key/Certificate bytes\n"
+    }
+    if config.InFlightPayloadBufferSize < 0 {
+        errorStrs += "Invalid InFlightPayloadBufferSize. Should be > 0 (and probably around 10000)\n"
+    }
+    if config.MaxOutboundTCPFrameSize < 0 || config.MaxOutboundTCPFrameSize > TCP_FRAME_MAX {
+        errorStrs += "Invalid MaxOutboundTCPFrameSize. Should be between 0 and TCP_FRAME_MAX (and probably above 256)\n"
+    }
+    if config.MaxPayloadSize < 0 {
+        errorStrs += "Invalid MaxPayloadSize. Should be greater than 0.\n"
+    }
+
+    if errorStrs != "" {
+        return nil, errors.New(errorStrs)
+    }
+
+    if config.InFlightPayloadBufferSize == 0 {
+        config.InFlightPayloadBufferSize = 10000
+    }
+    if config.MaxOutboundTCPFrameSize == 0 {
+        config.MaxOutboundTCPFrameSize = TCP_FRAME_MAX
+    }
+    if config.FramingTimeout == 0 {
+        config.FramingTimeout = 10
+    }
+    if config.GatewayPort == "" {
+        config.GatewayPort = "2195"
+    }
+    if config.GatewayHost == "" {
+        config.GatewayHost = "gateway.push.apple.com"
+    }
+    if config.MaxPayloadSize == 0 {
+        config.MaxPayloadSize = 256
+    }
+
+    x509Cert, err := tls.X509KeyPair(config.CertificateBytes, config.KeyBytes)
+    if err != nil {
+        //failed to validate key pair
+        return nil, err
+    }
+
+    tlsConf := &tls.Config {
+        Certificates: []tls.Certificate{x509Cert},
+        ServerName: config.GatewayHost,
+    }
+
+    tcpSocket, err := net.Dial("tcp", config.GatewayHost + ":" + config.GatewayPort)
+    if err != nil {
+        //failed to connect to gateway
+        return nil, err
+    }
+
+    tlsSocket := tls.Client(tcpSocket, tlsConf)
+    err = tlsSocket.Handshake()
+    if err != nil {
+        //failed to handshake with tls information
+        return nil, err
+    }
+
+    //hooray! we're connected
+
+    return socketAPNSConnection(tlsSocket, config), nil
 }
 
-func socketAPNSConnection(socket net.Conn) (*APNSConnection) {
-    return socketAPNSConnectionBufSize(socket, 10000)
-}
-
-func socketAPNSConnectionBufSize(socket net.Conn, bufferSize int) (*APNSConnection) {
+//Internal create APNS connection from raw socket
+//Starts connection close and send listeners
+func socketAPNSConnection(socket net.Conn, config *APNSConfig) (*APNSConnection) {
     c := new(APNSConnection)
-    c.inFlightPayloadBufferSize = bufferSize
+    c.config = config
     c.inFlightPayloadBuffer = list.New()
     c.socket = socket
     c.SendChannel = make(chan *Payload)
@@ -95,6 +173,8 @@ func socketAPNSConnectionBufSize(socket net.Conn, bufferSize int) (*APNSConnecti
     return c
 }
 
+//Disconnect from the Apns Gateway
+//Flushes any currently unsent messages before disconnecting from the socket
 func (c *APNSConnection) Disconnect() {
     //flush on disconnect
     c.inFlightBufferLock.Lock()
@@ -103,10 +183,12 @@ func (c *APNSConnection) Disconnect() {
     c.noFlushDisconnect()
 }
 
+//internal close socket
 func (c *APNSConnection) noFlushDisconnect() {
     c.socket.Close()
 }
 
+//go-routine to listen for socket closes or apple response information
 func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
     buffer := make([]byte, 6, 6)
     _, err := c.socket.Read(buffer)
@@ -126,11 +208,13 @@ func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
     }
 }
 
+//go-routine to listen for Payloads which should be sent
 func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
     var appleError *AppleError
 
     longTimeoutDuration := 5 * time.Minute
-    shortTimeoutDuration := 10 * time.Millisecond
+    shortTimeoutDuration := time.Duration(c.config.FramingTimeout) * time.Millisecond
+    zeroTimeoutDuration := 0 * time.Millisecond
     timeoutTimer := time.NewTimer(longTimeoutDuration)
 
     for {
@@ -143,8 +227,6 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
                 //channel was closed
                 return
             }
-            //do something here...
-            //fmt.Printf("Adding payload to flush buffer: %v\n", *sendPayload)
             idPayloadObj := &idPayload{
                 Payload: sendPayload,
                 Id: c.payloadIdCounter,
@@ -153,15 +235,22 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
             c.inFlightPayloadBuffer.PushFront(idPayloadObj)
             //check to see if we've overrun our buffer
             //if so, remove one from the buffer
-            if c.inFlightPayloadBuffer.Len() > c.inFlightPayloadBufferSize {
-                //fmt.Printf("Removing %v from buffer because of overflow, buf len %v\n", *c.inFlightPayloadBuffer.Back().Value.(*idPayload).Payload, c.inFlightPayloadBuffer.Len())
+            if c.inFlightPayloadBuffer.Len() > c.config.InFlightPayloadBufferSize {
                 c.inFlightPayloadBuffer.Remove(c.inFlightPayloadBuffer.Back())
             }
 
             c.bufferPayload(idPayloadObj)
 
-            //schedule short timeout
-            timeoutTimer.Reset(shortTimeoutDuration)
+            if shortTimeoutDuration > zeroTimeoutDuration {
+                //schedule short timeout
+                timeoutTimer.Reset(shortTimeoutDuration)
+            } else {
+                //flush buffer to socket
+                c.inFlightBufferLock.Lock()
+                c.flushBufferToSocket()
+                c.inFlightBufferLock.Unlock()
+                timeoutTimer.Reset(longTimeoutDuration)
+            }
             break
         case <- timeoutTimer.C:
             //flush buffer to socket
@@ -201,14 +290,10 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 
         close(c.CloseChannel)
     }()
-
-    fmt.Printf("Finished listening for payloads\n")
 }
 
-/**
- * THREADSAFE (with regard to interaction with the frameBuffer using frameBufferLock)
- * Must send in empty itemBuffer and empty frameBuffer
- */
+//Write buffer payload to tcp frame buffer and flush if tcp frame buffer full
+//THREADSAFE (with regard to interaction with the frameBuffer using frameBufferLock)
 func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
     //acquire lock to tcp buffer to do length checking, buffer writing,
     //and potentially flush buffer
@@ -220,7 +305,7 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
         c.Disconnect()
         return
     }
-    payloadBytes, err := idPayloadObj.Payload.marshalAlertBodyPayload(256)
+    payloadBytes, err := idPayloadObj.Payload.marshalAlertBodyPayload(c.config.MaxPayloadSize)
     if err != nil {
         fmt.Printf("Failed to marshall payload %v : %v\n", idPayloadObj.Payload, err)
         c.Disconnect()
@@ -272,9 +357,10 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
     c.inFlightBufferLock.Unlock()
 }
 
-/**
- * NOT THREADSAFE (need to acquire inFlightBufferLock before calling)
- */
+
+//NOT THREADSAFE (need to acquire inFlightBufferLock before calling)
+//Write tcp frame buffer to socket and reset when done
+//Close on error
 func (c *APNSConnection) flushBufferToSocket() {
     //if buffer not created, or zero length, or just has header information written
     //do nothing
@@ -283,8 +369,6 @@ func (c *APNSConnection) flushBufferToSocket() {
     }
 
     bufBytes := c.inFlightFrameByteBuffer.Bytes()
-
-    //fmt.Printf("Flushing buffer %x\n", bufBytes)
 
     //write to socket
     _, writeErr := c.socket.Write(bufBytes)

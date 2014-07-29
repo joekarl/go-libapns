@@ -7,27 +7,28 @@ import (
 )
 
 type Payload struct {
-    ActionLocKey         string
-    AlertText            string
-    Badge                int
+    ActionLocKey         string                 
+    AlertText            string                 //alert text, may be truncated if bigger than max payload size
+    Badge                int              
     ContentAvailable     int
-    CustomFields         map[string]interface{}
-    ExpirationTime       uint32
+    CustomFields         map[string]interface{} //any custom fields to be added to the apns payload
+    ExpirationTime       uint32                 //unix time in seconds when the payload is invalid
     LaunchImage          string
     LocArgs              []string
     LocKey               string
-    Priority             uint8
+    Priority             uint8                  //must be either 5 or 10, if not one of these two values will default to 5
     Sound                string
-    Token                string
-    ExtraData            interface{}
+    Token                string                 //push token, should contain no spaces
+    ExtraData            interface{}            //any extra data to be associated with this payload, 
+                                                //will not be sent to apple but will be held onto for error cases
 }
 
 type apsAlertBody struct {
-    Body                 string     `json:"body,omitempty"`
-    ActionLocKey         string     `json:"action-loc-key,omitempty"`
-    LocKey               string     `json:"loc-key,omitempty"`
-    LocArgs              []string   `json:"loc-args,omitempty"`
-    LaunchImage          string     `json:"launch-image,omitempty"`
+    Body                 string       `json:"body,omitempty"`
+    ActionLocKey         string       `json:"action-loc-key,omitempty"`
+    LocKey               string       `json:"loc-key,omitempty"`
+    LocArgs              []string     `json:"loc-args,omitempty"`
+    LaunchImage          string       `json:"launch-image,omitempty"`
 }
 
 type alertBodyAps struct {
@@ -38,12 +39,13 @@ type alertBodyAps struct {
 }
 
 type simpleAps struct {
-    Alert                string     `json:"alert,omitempty"`
-    Badge                int        `json:"badge,omitempty"`
-    Sound                string     `json:"sound,omitempty"`
-    ContentAvailable     int        `json:"content-available,omitempty"`
+    Alert                string       `json:"alert,omitempty"`
+    Badge                int          `json:"badge,omitempty"`
+    Sound                string       `json:"sound,omitempty"`
+    ContentAvailable     int          `json:"content-available,omitempty"`
 }
 
+//Convert a Payload into a json object and then converted to a byte array
 func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
     // found in https://github.com/anachronistic/apns/blob/master/push_notification.go#L93
     // This deserves some explanation.
@@ -69,11 +71,14 @@ func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
     }
 }
 
+//Whether or not to use simple aps format or not
 func (p *Payload) isSimple() bool {
     return p.ActionLocKey == "" && p.LocKey == "" &&
            p.LocArgs == nil && p.LaunchImage == ""
 }
 
+//Helper method to generate a json compatible map with aps key + custom fields
+//will return error if custom field named aps supplied
 func constructFullPayload(aps interface{}, customFields map[string]interface{}) (map[string]interface{}, error) {
     var fullPayload map[string]interface{} = make(map[string]interface{})
     fullPayload["aps"] = aps
@@ -86,6 +91,8 @@ func constructFullPayload(aps interface{}, customFields map[string]interface{}) 
     return fullPayload, nil
 }
 
+//Handle simple payload case with just text alert
+//Handle truncating of alert text if too long for maxPayloadSize
 func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
     var jsonStr []byte = nil
 
@@ -129,6 +136,8 @@ func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
     return jsonStr, nil
 }
 
+//Handle complet payload case with alert object
+//Handle truncating of alert text if too long for maxPayloadSize
 func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
     var jsonStr []byte = nil
 
