@@ -30,6 +30,7 @@
           <li><a href="http://github.com/joekarl/go-libapns">Source</a></li>
           <li><a href="http://godoc.org/github.com/joekarl/go-libapns">GoDoc</a></li>
           <li><a href="#quickstart">Quickstart</a></li>
+          <li><a href="#contribute">Contribute</a></li>
         </ul>
       </div>
     </div>
@@ -47,16 +48,42 @@
       </div>
     </div>
 
+    <div class="container">
+      <p>When it comes to APNS libraries, most of them make some fatal mistakes. Those mistakes tend to boil down to: not handling the latest guidelines from Apple, relying on inefficient networking, or not handling errors in the ways Apple requires you to. go-libapns tries to be a simple low level interface that should be able to handle large amounts of push notifications in a CPU, Memory, and Network effecient manner. go-libapns also looks to be prepared for the future, with the impending expansion of the APNS payload and new fields, the code is mostly setup to handle these new featues.</p>
+    </div>
+
+    <div id="contribute" class="container">
+      <h3>Contributing</h3>
+      <p>go-libapns is open source and the code is on github. Feel free to submit pull requests and bug reports.</p>
+    </div>
+
     <div id="quickstart" class="container">
-      <h4>Quickstart</h4>
+      <h3>Quickstart</h3>
+      <h6>Get the code</h6>
+      <code>go get github.com/joekarl/go-libapns</code>
+      <h6>Send push notifications!</h6>
       <script src="https://gist.github.com/joekarl/a93238739cf9b339a924.js"></script>
     </div>
+
+    <div class="container">
+      <h3>Handling Errors</h3>
+      <p>Due to Apple's streaming protocol, errors are a bit tricky to handle correctly. However by following a few simple guidelines, go-libapns will do the heavy lifting for you, allowing you to focus on what you want to do when an error occurs.</p>
+      <p>
+        <ol>
+          <li>Whenever you write to the SendChannel, you should also listen to the close channel. This is easy to do with a select.</li>
+          <li>Even though go-libapns has accepted a message, it doesn't mean that message has been sent to Apple yet. You can flush the network by calling Disconnect() or by waiting a while to see if the close channel fires, but by far the best option is to listen to the close channel constantly and never manually close the connection.</li>
+          <li>When the close channel fires, you'll get back a ConnectionClose object. This object will contain information about why the connection was closed, but more importantly it will give you back a list of unsent messages that you should attempt to resend.</li>
+        </ol>
+      </p>
+      <script src="https://gist.github.com/joekarl/e38ffa0f5595c4c0b1ff.js"></script>
+    </div>
+
 
     <footer>
       <div class="container">
         <ul class="list-unstyled">
           <li class="pull-right"><a href="#top">Back to top</a></li>
-          <li><a href="http://joekarl.github.io" onclick="pageTracker._link(this.href); return false;">Blog</a></li>
+          <li><a href="http://joekarl.github.io">Blog</a></li>
           <li><a href="https://twitter.com/joekarl">Twitter</a></li>
           <li><a href="https://github.com/joekarl/">GitHub</a></li>
         </ul>
