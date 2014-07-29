@@ -1,5 +1,3 @@
-//Package for creating a connection to Apple's APNS gateway and facilitating 
-//sending push notifications via that gateway
 package apns
 
 import (
