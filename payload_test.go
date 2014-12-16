@@ -11,6 +11,7 @@ func TestSimpleMarshal(t *testing.T) {
 		Badge:            2,
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
+		Category:         "TEST_CATEGORY",
 	}
 
 	payloadSize := 256
@@ -24,7 +25,7 @@ func TestSimpleMarshal(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
 	}
@@ -182,6 +183,7 @@ func TestAlertBodyMarshal(t *testing.T) {
 		AlertText:        "Testing this payload",
 		Badge:            2,
 		ContentAvailable: 1,
+		Category:         "TEST_CATEGORY",
 		Sound:            "test.aiff",
 		ActionLocKey:     "act-loc-key",
 		LocKey:           "loc-key",
@@ -200,9 +202,9 @@ func TestAlertBodyMarshal(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\",\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\",\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
 	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
 }
 

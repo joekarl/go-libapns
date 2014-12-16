@@ -12,6 +12,7 @@ type Payload struct {
 	//alert text, may be truncated if bigger than max payload size
 	AlertText        string
 	Badge            int
+	Category         string
 	ContentAvailable int
 	//any custom fields to be added to the apns payload
 	CustomFields map[string]interface{}
@@ -42,6 +43,7 @@ type alertBodyAps struct {
 	Alert            apsAlertBody `json:"alert,omitempty"`
 	Badge            int          `json:"badge,omitempty"`
 	Sound            string       `json:"sound,omitempty"`
+	Category         string       `json:"category,omitempty"`
 	ContentAvailable int          `json:"content-available,omitempty"`
 }
 
@@ -49,6 +51,7 @@ type simpleAps struct {
 	Alert            string `json:"alert,omitempty"`
 	Badge            int    `json:"badge,omitempty"`
 	Sound            string `json:"sound,omitempty"`
+	Category         string `json:"category,omitempty"`
 	ContentAvailable int    `json:"content-available,omitempty"`
 }
 
@@ -111,6 +114,7 @@ func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
 		Alert:            p.AlertText,
 		Badge:            p.Badge,
 		Sound:            p.Sound,
+		Category:         p.Category,
 		ContentAvailable: p.ContentAvailable,
 	}
 
@@ -164,6 +168,7 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 		Alert:            alertBody,
 		Badge:            p.Badge,
 		Sound:            p.Sound,
+		Category:         p.Category,
 		ContentAvailable: p.ContentAvailable,
 	}
 
