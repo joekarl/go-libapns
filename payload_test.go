@@ -27,7 +27,7 @@ func TestSimpleMarshal(t *testing.T) {
 
 	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
 	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
 }
 
