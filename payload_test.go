@@ -31,6 +31,58 @@ func TestSimpleMarshal(t *testing.T) {
 	}
 }
 
+func TestBadge0ShouldOmitBadge(t *testing.T) {
+	p := Payload{
+		AlertText:        "Testing this payload",
+		Badge:            0,
+		ContentAvailable: 1,
+		Sound:            "test.aiff",
+		Category:         "TEST_CATEGORY",
+	}
+
+	payloadSize := 256
+
+	json, err := p.Marshal(payloadSize)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(json) > payloadSize {
+		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
+	}
+
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
+	if string(json) != expectedJson {
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
+	}
+}
+
+func TestBadgeLessThan0ShouldBadgeMinus1(t *testing.T) {
+	p := Payload{
+		AlertText:        "Testing this payload",
+		Badge:            -5,
+		ContentAvailable: 1,
+		Sound:            "test.aiff",
+		Category:         "TEST_CATEGORY",
+	}
+
+	payloadSize := 256
+
+	json, err := p.Marshal(payloadSize)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(json) > payloadSize {
+		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
+	}
+
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":-1,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
+	if string(json) != expectedJson {
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
+	}
+}
+
 func TestSimpleMarshalWithCustomFields(t *testing.T) {
 	customFields := map[string]interface{}{
 		"num": 55,

@@ -45,6 +45,8 @@ func main() {
 ```
 **Note** This example doesn't take into account essential error handling. See below for error handling details
 
+**Payload.Badge Need to Know** Apple specifies that one should set the badge key to 0 to clear the badge number. This unfortunately has the side effect of causing the go JSON serializer to omit the badge field. Luckily Apple uses negative badge numbers to clear the badge as well. So for our purposes, a badge > 0 will set the badge number, a badge < 0 will clear the badge number, and a badge == 0 will leave the badge number as is.
+
 ##Error Handling
 As per Apple's guidelines, when a connection is closed due to error, the id of the message which caused the error will be transmitted back over the connection. In this case, multiple push notifications may have followed the bad message. These push notifications will be supplied on a channel **as well as any other unsent messages** and will be then available to re-process. Also when writing to the send channel, you should wrap the send with a select and case both the send and connection close channels. This will allow you to correctly handle the async nature of Apple's error handling scheme.
 
