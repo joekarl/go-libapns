@@ -174,8 +174,8 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	}
 
 	tcpSocket, err := net.DialTimeout("tcp",
-																		config.GatewayHost+":"+config.GatewayPort,
-																		time.Duration(config.SocketTimeout) * time.Second)
+		config.GatewayHost+":"+config.GatewayPort,
+		time.Duration(config.SocketTimeout)*time.Second)
 	if err != nil {
 		//failed to connect to gateway
 		return nil, err

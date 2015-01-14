@@ -10,7 +10,7 @@ import (
 type Payload struct {
 	ActionLocKey string
 	//alert text, may be truncated if bigger than max payload size
-	AlertText        string
+	AlertText string
 	//number to set the badge to
 	//*Note this is lame but has to be handled this way
 	//because badge of 0 will be omitted from the final json
