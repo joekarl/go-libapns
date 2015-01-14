@@ -115,6 +115,9 @@ func main() {
 ##Persistent Connection
 go-libapns will use a persistant tcp connection (supplied by the user) to connect to Apple's APNS gateway. This allows for the greatest throughput to Apple's servers. On close or error, this connection will be killed and all unsent push notifications will be supplied for re-process. **Note** Unlike most other APNS libraries, go-libapns will NOT attempt to re-transmit your unsent payloads. Because it is trivial to write this retry logic, go-libapns leaves that to the user to implement as not everyone needs or wants this behavior (i.e. you may want to put the messages that need resent into a queue or store them for later).
 
+##Feedback Service
+Apple specifies that you should connect to the feedback service gateway regularly to keep track of devices that no longer have your application installed. go-libapns provides a simple interface to the feedback service. Simply create a `APNSFeedbackServiceConfig` object and then call `ConnectToFeedbackService`. This will return a list of device tokens that you should keep track of and not send push notifications to again.
+
 ##Push Notification Length
 Apple places a strict limit on push notification length (currently at 256 bytes). go-libapns will attempt to fit your push notification into that size limit by first applying all of your supplied custom fields and applying as much of your alert text as possible. This truncation is not without cost as it takes almost twice the time to fix a message that is too long. So if possible, try to find a sweet spot that won't cause truncation to occur. If unable to truncate the message, go-libapns will close it's connection to the APNS gateway (you've been warned). This limit is configurable in the APNSConfig object.
 
