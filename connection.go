@@ -1,4 +1,4 @@
-//Package for creating a connection to Apple's APNS gateway and facilitating 
+//Package for creating a connection to Apple's APNS gateway and facilitating
 //sending push notifications via that gateway
 package apns
 
@@ -34,6 +34,10 @@ type APNSConfig struct {
 	//max number of bytes to frame data to, defaults to TCP_FRAME_MAX
 	//generally best to NOT set this and use the default
 	MaxOutboundTCPFrameSize int
+	//number of seconds to wait for connection before bailing, defaults to 5 seconds
+	SocketTimeout int
+	//number of seconds to wait for Tls handshake to complete before bailing, defaults to 5 seconds
+	TlsTimeout int
 }
 
 //Object returned on a connection close or connection error
@@ -151,6 +155,12 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	if config.MaxPayloadSize == 0 {
 		config.MaxPayloadSize = 256
 	}
+	if config.SocketTimeout == 0 {
+		config.SocketTimeout = 5
+	}
+	if config.TlsTimeout == 0 {
+		config.TlsTimeout = 5
+	}
 
 	x509Cert, err := tls.X509KeyPair(config.CertificateBytes, config.KeyBytes)
 	if err != nil {
@@ -163,13 +173,16 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 		ServerName:   config.GatewayHost,
 	}
 
-	tcpSocket, err := net.Dial("tcp", config.GatewayHost+":"+config.GatewayPort)
+	tcpSocket, err := net.DialTimeout("tcp",
+																		config.GatewayHost+":"+config.GatewayPort,
+																		time.Duration(config.SocketTimeout) * time.Second)
 	if err != nil {
 		//failed to connect to gateway
 		return nil, err
 	}
 
 	tlsSocket := tls.Client(tcpSocket, tlsConf)
+	tlsSocket.SetDeadline(time.Now().Add(time.Duration(config.TlsTimeout) * time.Second))
 	err = tlsSocket.Handshake()
 	if err != nil {
 		//failed to handshake with tls information
