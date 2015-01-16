@@ -182,7 +182,7 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	}
 
 	tlsSocket := tls.Client(tcpSocket, tlsConf)
-	tlsSocket.SetWriteDeadline(time.Now().Add(time.Duration(config.TlsTimeout) * time.Second))
+	tlsSocket.SetDeadline(time.Now().Add(time.Duration(config.TlsTimeout) * time.Second))
 	err = tlsSocket.Handshake()
 	if err != nil {
 		//failed to handshake with tls information
@@ -190,6 +190,8 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	}
 
 	//hooray! we're connected
+	//reset the deadline so it doesn't fail subsequent writes
+	tlsSocket.SetDeadline(time.Time{})
 
 	return socketAPNSConnection(tlsSocket, config), nil
 }
