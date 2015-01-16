@@ -116,7 +116,8 @@ func main() {
 go-libapns will use a persistant tcp connection (supplied by the user) to connect to Apple's APNS gateway. This allows for the greatest throughput to Apple's servers. On close or error, this connection will be killed and all unsent push notifications will be supplied for re-process. **Note** Unlike most other APNS libraries, go-libapns will NOT attempt to re-transmit your unsent payloads. Because it is trivial to write this retry logic, go-libapns leaves that to the user to implement as not everyone needs or wants this behavior (i.e. you may want to put the messages that need resent into a queue or store them for later).
 
 ##Feedback Service
-Apple specifies that you should connect to the feedback service gateway regularly to keep track of devices that no longer have your application installed. go-libapns provides a simple interface to the feedback service. Simply create a `APNSFeedbackServiceConfig` object and then call `ConnectToFeedbackService`. This will return a list of device tokens that you should keep track of and not send push notifications to again.
+Apple specifies that you should connect to the feedback service gateway regularly to keep track of devices that no longer have your application installed. go-libapns provides a simple interface to the feedback service. Simply create a `APNSFeedbackServiceConfig` object and then call `ConnectToFeedbackService`. This will return a list of device tokens that you should keep track of and not send push notifications to again (specifically this will return a List of `*FeedbackResponse`)
+
 
 ##Push Notification Length
 Apple places a strict limit on push notification length (currently at 256 bytes). go-libapns will attempt to fit your push notification into that size limit by first applying all of your supplied custom fields and applying as much of your alert text as possible. This truncation is not without cost as it takes almost twice the time to fix a message that is too long. So if possible, try to find a sweet spot that won't cause truncation to occur. If unable to truncate the message, go-libapns will close it's connection to the APNS gateway (you've been warned). This limit is configurable in the APNSConfig object.
@@ -128,9 +129,6 @@ Most APNS libraries rely on the OS Nagling to buffer data into the socket. go-li
 * FramingTimeout - (default 10ms) Max time between TCP flushes
 
 TCP_NODELAY can be turned on with this setup by setting the FramingTimeout to anything less than 0 (like -1). In practice you want this buffering to occur, so best to leave defaults. If you're concerned about a (max) 10ms delay between your push notifications being sent onto the socket be aware that this is much much much shorter than the default linux Nagle timeout of 1 second.
-
-##Feedback Service
-Right now there is no implementation of the feedback service in this library, but one is planned.
 
 ##What's with using channels for writing to the connection?
 Basically, this makes it easier to synchronize error handling and socket errors. Not sure if this is the best idea, but definitely works.
