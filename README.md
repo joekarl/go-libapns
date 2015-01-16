@@ -24,93 +24,54 @@ package main
 
 import (
     apns "github.com/joekarl/go-libapns"
-    "ioutil"
+    "io/ioutil"
 )
 
 func main() {
-    //tlsConn is a socket connection to apple's gateway
-    apnsConnection, _ := apns.NewAPNSConnection(&APNSConfig{
-        CertificateBytes: ioutil.ReadFile("path/to/cert.pem"),
-        KeyBytes: ioutil.Readfile("path/to/key.pem")
-    })
+  certPem, err := ioutil.ReadFile("../certs/PushTestCert.pem")
+  if err != nil {
+    panic(err)
+  }
+  keyPem, err := ioutil.ReadFile("../certs/PushTestKey-noenc.pem")
+  if err != nil {
+    panic(err)
+  }
 
-    payload := &apns.Payload {
-        Token: "2ed202ac08ea9...cf8d55910df290567037dcc4",
-        AlertText: "This is a push notification!",
-    }
+  apnsConnection, _ := apns.NewAPNSConnection(&APNSConfig{
+      CertificateBytes: certPem,
+      KeyBytes: keyPem,
+  })
 
-    apnsConnection.SendChannel <- payload
-    apnsConnection.Disconnect()
+  payload := &apns.Payload {
+      Token: "2ed202ac08ea9...cf8d55910df290567037dcc4",
+      AlertText: "This is a push notification!",
+  }
+
+  apnsConnection.SendChannel <- payload
+  apnsConnection.Disconnect()
 }
 ```
 **Note** This example doesn't take into account essential error handling. See below for error handling details
 
 **Payload.Badge Need to Know** Apple specifies that one should set the badge key to 0 to clear the badge number. This unfortunately has the side effect of causing the go JSON serializer to omit the badge field. Luckily Apple uses negative badge numbers to clear the badge as well. So for our purposes, a badge > 0 will set the badge number, a badge < 0 will clear the badge number, and a badge == 0 will leave the badge number as is.
 
-##Error Handling
-As per Apple's guidelines, when a connection is closed due to error, the id of the message which caused the error will be transmitted back over the connection. In this case, multiple push notifications may have followed the bad message. These push notifications will be supplied on a channel **as well as any other unsent messages** and will be then available to re-process. Also when writing to the send channel, you should wrap the send with a select and case both the send and connection close channels. This will allow you to correctly handle the async nature of Apple's error handling scheme.
+##Pem Certs
+You should provide your apns certificate as separated cert/key pem files. Currently go doesn't support password protected pem files (https://github.com/golang/go/issues/6722) so you'll need remove the password from your key pem.
 
-```go
-package main
+####Separate pem files from p12
+```sh
+openssl pkcs12 -clcerts -nokeys -out cert.pem -in cert.p12
 
-import (
-    apns "github.com"
-    "ioutils"
-    "net"
-)
-
-func main() {
-
-    apnsConnection, err := apns.NewAPNSConnection(&APNSConfig{
-        CertificateBytes: ioutil.ReadFile("path/to/cert.pem"),
-        KeyBytes: ioutil.Readfile("path/to/key.pem")
-    })
-
-    if err != nil {
-        //probably bad cert, or bad network
-        panic(err)
-    }
-
-    var payload *apns.Payload
-    var sendError *apns.ConnectionClose
-    for i := 0; i < 1000; i++ {
-        if sendError != nil {
-            break
-        }
-        payload = &apns.Payload {
-            Token: getTokenForUser(i),
-            AlertText: "This is a push notification",
-        }
-
-        select {
-            case apnsConnection.SendChannel <- payload:
-                //hooray! we wrote the payload to the socket
-                break
-            case sendError = <- apnsConnection.CloseChannel:
-                //something happened to our apns connection :(
-                //also it has disconnected itself from the socket
-                break
-        }
-    }
-
-    if sendError != nil {
-        //*list.List list of payloads that need to be resent
-        sendError.UnsentPayloads
-
-        //*apns.Payload payload which apple indicates caused error
-        //    (only set if a payload caused the error)
-        sendError.ErrorPayload
-
-        //*apns.AppleError actual apple error information
-        sendError.Error
-
-        //bool if this is true, then we overflowed our buffer and
-        //    some notifications were lost due to error
-        sendError.UnsentPayloadBufferOverflow
-    }
-
-}
+openssl pkcs12 -nocerts -out key.pem -in key.p12
 ```
+
+####Remove password from pem file
+```sh
+openssl rsa -in key.pem -out key-noenc.pem
+```
+
+##Error Handling
+As per Apple's guidelines, when a connection is closed due to error, the id of the message which caused the error will be transmitted back over the connection. In this case, multiple push notifications may have followed the bad message. These push notifications will be supplied on a channel **as well as any other unsent messages** and will be then available to re-process. Also when writing to the send channel, you should wrap the send with a select and case both the send and connection close channels. This will allow you to correctly handle the async nature of Apple's error handling scheme. See this gist (https://gist.github.com/joekarl/86d9bdb8f9af044710b7) for a full featured example of how to integrate go-libapns with proper shutdown handling and looped connection handling.
 
 ##Persistent Connection
 go-libapns will use a persistant tcp connection (supplied by the user) to connect to Apple's APNS gateway. This allows for the greatest throughput to Apple's servers. On close or error, this connection will be killed and all unsent push notifications will be supplied for re-process. **Note** Unlike most other APNS libraries, go-libapns will NOT attempt to re-transmit your unsent payloads. Because it is trivial to write this retry logic, go-libapns leaves that to the user to implement as not everyone needs or wants this behavior (i.e. you may want to put the messages that need resent into a queue or store them for later).
