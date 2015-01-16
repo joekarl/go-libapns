@@ -155,6 +155,9 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	if config.MaxPayloadSize == 0 {
 		config.MaxPayloadSize = 256
 	}
+	if config.TlsTimeout == 0 {
+		config.TlsTimeout = 5
+	}
 
 	x509Cert, err := tls.X509KeyPair(config.CertificateBytes, config.KeyBytes)
 	if err != nil {
