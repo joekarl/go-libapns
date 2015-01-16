@@ -8,7 +8,7 @@ import (
 func TestSimpleMarshal(t *testing.T) {
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		Category:         "TEST_CATEGORY",
@@ -31,58 +31,6 @@ func TestSimpleMarshal(t *testing.T) {
 	}
 }
 
-func TestBadge0ShouldOmitBadge(t *testing.T) {
-	p := Payload{
-		AlertText:        "Testing this payload",
-		Badge:            0,
-		ContentAvailable: 1,
-		Sound:            "test.aiff",
-		Category:         "TEST_CATEGORY",
-	}
-
-	payloadSize := 256
-
-	json, err := p.Marshal(payloadSize)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(json) > payloadSize {
-		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
-	}
-
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
-	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
-	}
-}
-
-func TestBadgeLessThan0ShouldBadgeMinus1(t *testing.T) {
-	p := Payload{
-		AlertText:        "Testing this payload",
-		Badge:            -5,
-		ContentAvailable: 1,
-		Sound:            "test.aiff",
-		Category:         "TEST_CATEGORY",
-	}
-
-	payloadSize := 256
-
-	json, err := p.Marshal(payloadSize)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(json) > payloadSize {
-		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
-	}
-
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":-1,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
-	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
-	}
-}
-
 func TestSimpleMarshalWithCustomFields(t *testing.T) {
 	customFields := map[string]interface{}{
 		"num": 55,
@@ -96,7 +44,7 @@ func TestSimpleMarshalWithCustomFields(t *testing.T) {
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -124,7 +72,7 @@ func TestSimpleMarshalTruncate(t *testing.T) {
 		AlertText: "Testing this payload with a really long message that should " +
 			"cause the payload to be truncated yay and stuff blah blah blah blah blah blah " +
 			"and some more text to really make this much bigger and stuff",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 	}
@@ -161,7 +109,7 @@ func TestSimpleMarshalTruncateWithCustomFields(t *testing.T) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -216,7 +164,7 @@ func TestSimpleMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T) {
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -233,7 +181,7 @@ func TestSimpleMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T) {
 func TestAlertBodyMarshal(t *testing.T) {
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Category:         "TEST_CATEGORY",
 		Sound:            "test.aiff",
@@ -273,7 +221,7 @@ func TestAlertBodyMarshalWithCustomFields(t *testing.T) {
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -308,7 +256,7 @@ func TestAlertBodyMarshalTruncate(t *testing.T) {
 		AlertText: "Testing this payload with a really long message that should " +
 			"cause the payload to be truncated yay and stuff blah blah blah blah blah blah " +
 			"and some more text to really make this much bigger and stuff",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		LaunchImage:      "launch.png",
@@ -343,7 +291,7 @@ func TestAlertBodyMarshalTruncateWithCustomFields(t *testing.T) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -402,7 +350,7 @@ func TestAlertBodyMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T)
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -432,7 +380,7 @@ func BenchmarkSimpleMarshalTruncate256WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -459,7 +407,7 @@ func BenchmarkSimpleMarshalTruncate1024WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -486,7 +434,7 @@ func BenchmarkAlertBodyMarshalTruncate256WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -514,7 +462,7 @@ func BenchmarkAlertBodyMarshalTruncate1024WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            Int(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,

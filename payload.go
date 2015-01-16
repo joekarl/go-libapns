@@ -11,13 +11,8 @@ type Payload struct {
 	ActionLocKey string
 	//alert text, may be truncated if bigger than max payload size
 	AlertText string
-	//number to set the badge to
-	//*Note this is lame but has to be handled this way
-	//because badge of 0 will be omitted from the final json
-	//if set to 0 will not send a badge number
-	//if set to > 0 will set the badge number
-	//if set to < 0 will clear the current badge number
-	Badge            int
+	//number to set the badge to (pointer so omitempty behaves properly)
+	Badge            *int
 	Category         string
 	ContentAvailable int
 	//any custom fields to be added to the apns payload
@@ -47,7 +42,7 @@ type apsAlertBody struct {
 
 type alertBodyAps struct {
 	Alert            apsAlertBody `json:"alert,omitempty"`
-	Badge            int          `json:"badge,omitempty"`
+	Badge            *int         `json:"badge,omitempty"`
 	Sound            string       `json:"sound,omitempty"`
 	Category         string       `json:"category,omitempty"`
 	ContentAvailable int          `json:"content-available,omitempty"`
@@ -55,7 +50,7 @@ type alertBodyAps struct {
 
 type simpleAps struct {
 	Alert            string `json:"alert,omitempty"`
-	Badge            int    `json:"badge,omitempty"`
+	Badge            *int   `json:"badge,omitempty"`
 	Sound            string `json:"sound,omitempty"`
 	Category         string `json:"category,omitempty"`
 	ContentAvailable int    `json:"content-available,omitempty"`
@@ -66,23 +61,6 @@ type simpleAps struct {
 //an attempt will be made to truncate the AlertText
 //If this cannot be done, then an error will be returned
 func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
-	// found in https://github.com/anachronistic/apns/blob/master/push_notification.go#L93
-	// This deserves some explanation.
-	//
-	// Setting an exported field of type int to 0
-	// triggers the omitempty behavior if you've set it.
-	// Since the badge is optional, we should omit it if
-	// it's not set. However, we want to include it if the
-	// value is 0, so there's a hack in payload.go
-	// that exploits the fact that Apple treats -1 for a
-	// badge value as though it were 0 (i.e. it clears the
-	// badge but doesn't stop the notification from going
-	// through successfully.)
-	//
-	// Still a hack though o_0
-	if p.Badge < 0 {
-		p.Badge = -1
-	}
 	if p.isSimple() {
 		return p.marshalSimplePayload(maxPayloadSize)
 	} else {
@@ -208,4 +186,9 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 	}
 
 	return jsonStr, nil
+}
+
+func Int(v int) *int {
+	p := v
+	return &p
 }
