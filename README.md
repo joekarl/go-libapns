@@ -148,7 +148,7 @@ GatewayPort                     string                  //apple gateway port, de
 MaxOutboundTCPFrameSize         int                     //max number of bytes to frame data to, defaults to TCP_FRAME_MAX
                                                         //generally best to NOT set this and use the default
 SocketTimeout                   int                     //number of seconds to wait before bailing on a socket connection, defaults to no timeout
-TlsTimeout                      int                     //number of seconds to wait before bailing on a tls handshake, defaults to no timeout
+TlsTimeout                      int                     //number of seconds to wait before bailing on a tls handshake, defaults to 5 sec
 ```
 
 #License
