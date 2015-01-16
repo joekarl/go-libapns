@@ -34,9 +34,9 @@ type APNSConfig struct {
 	//max number of bytes to frame data to, defaults to TCP_FRAME_MAX
 	//generally best to NOT set this and use the default
 	MaxOutboundTCPFrameSize int
-	//number of seconds to wait for connection before bailing, defaults to 5 seconds
+	//number of seconds to wait for connection before bailing, defaults to no timeout
 	SocketTimeout int
-	//number of seconds to wait for Tls handshake to complete before bailing, defaults to 5 seconds
+	//number of seconds to wait for Tls handshake to complete before bailing, defaults to no timeout
 	TlsTimeout int
 }
 
@@ -154,12 +154,6 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	}
 	if config.MaxPayloadSize == 0 {
 		config.MaxPayloadSize = 256
-	}
-	if config.SocketTimeout == 0 {
-		config.SocketTimeout = 5
-	}
-	if config.TlsTimeout == 0 {
-		config.TlsTimeout = 5
 	}
 
 	x509Cert, err := tls.X509KeyPair(config.CertificateBytes, config.KeyBytes)
