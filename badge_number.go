@@ -5,24 +5,34 @@ import (
 	"strconv"
 )
 
+// Struct representing the badge number over
+// the app icon on iOS
 type BadgeNumber struct {
 	number int
 	set    bool
 }
 
+// Returns the set badge number
 func (b *BadgeNumber) Number() int {
 	return b.number
 }
 
+// Returns whether or not this BadgeNumber
+// is set and should be sent in the APNS payload
 func (b *BadgeNumber) IsSet() bool {
 	return b.set
 }
 
+// Resets the BadgeNumber to 0 and
+// removes it from the APNS payload
 func (b *BadgeNumber) UnSet() {
 	b.number = 0
 	b.set = false
 }
 
+// Sets the badge number and includes it in the
+// payload to APNS. call .Set(0) to have the badge
+// number cleared from the app icon
 func (b *BadgeNumber) Set(number int) error {
 	if number < 0 {
 		return errors.New("Number must be >= 0")
@@ -55,6 +65,8 @@ func (b *BadgeNumber) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Get a new badge number, set to the initial
+// number, and included in the payload
 func NewBadgeNumber(number int) BadgeNumber {
 	return BadgeNumber{
 		number: number,

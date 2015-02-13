@@ -11,12 +11,7 @@ type Payload struct {
 	ActionLocKey string
 	//alert text, may be truncated if bigger than max payload size
 	AlertText string
-	//number to set the badge to
-	//*Note this is lame but has to be handled this way
-	//because badge of 0 will be omitted from the final json
-	//if set to 0 will not send a badge number
-	//if set to > 0 will set the badge number
-	//if set to < 0 will clear the current badge number
+	// Number to set the badge number to of the app icon
 	Badge            BadgeNumber
 	Category         string
 	ContentAvailable int
