@@ -194,7 +194,7 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 }
 
 func (s simpleAps) MarshalJSON() ([]byte, error) {
-	toMarshal := map[string]interface{}{}
+	toMarshal := make(map[string]interface{})
 
 	if s.Alert != "" {
 		toMarshal["alert"] = s.Alert
@@ -216,7 +216,7 @@ func (s simpleAps) MarshalJSON() ([]byte, error) {
 }
 
 func (a alertBodyAps) MarshalJSON() ([]byte, error) {
-	toMarshal := map[string]interface{}{}
+	toMarshal := make(map[string]interface{})
 	toMarshal["alert"] = a.Alert
 
 	if a.Badge.IsSet() {
