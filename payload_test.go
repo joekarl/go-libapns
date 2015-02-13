@@ -205,15 +205,17 @@ func TestSimpleMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T) {
 
 func TestAlertBodyMarshal(t *testing.T) {
 	p := Payload{
-		AlertText:        "Testing this payload",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Category:         "TEST_CATEGORY",
 		Sound:            "test.aiff",
-		ActionLocKey:     "act-loc-key",
-		LocKey:           "loc-key",
-		LocArgs:          []string{"arg1", "arg2"},
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body:         "Testing this payload",
+			ActionLocKey: "act-loc-key",
+			LocKey:       "loc-key",
+			LocArgs:      []string{"arg1", "arg2"},
+			LaunchImage:  "launch.png",
+		},
 	}
 
 	payloadSize := 256
@@ -245,14 +247,16 @@ func TestAlertBodyMarshalWithCustomFields(t *testing.T) {
 	}
 
 	p := Payload{
-		AlertText:        "Testing this payload",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
-		ActionLocKey:     "act-loc-key",
-		LocKey:           "loc-key",
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body:         "Testing this payload",
+			ActionLocKey: "act-loc-key",
+			LocKey:       "loc-key",
+			LaunchImage:  "launch.png",
+		},
 	}
 
 	payloadSize := 256
@@ -278,13 +282,15 @@ func TestAlertBodyMarshalWithCustomFields(t *testing.T) {
 
 func TestAlertBodyMarshalTruncate(t *testing.T) {
 	p := Payload{
-		AlertText: "Testing this payload with a really long message that should " +
-			"cause the payload to be truncated yay and stuff blah blah blah blah blah blah " +
-			"and some more text to really make this much bigger and stuff",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body: "Testing this payload with a really long message that should " +
+				"cause the payload to be truncated yay and stuff blah blah blah blah blah blah " +
+				"and some more text to really make this much bigger and stuff",
+			LaunchImage: "launch.png",
+		},
 	}
 
 	payloadSize := 256
@@ -313,17 +319,19 @@ func TestAlertBodyMarshalTruncateWithCustomFields(t *testing.T) {
 	}
 
 	p := Payload{
-		AlertText: "Testing this payload with a bunch of text that should get truncated " +
-			"so truncate this already please yes thank you blah blah blah blah blah blah " +
-			"plus some more text",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
-		ActionLocKey:     "act-loc-key",
-		LocKey:           "loc-key",
-		LocArgs:          []string{"arg1", "arg2"},
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body: "Testing this payload with a bunch of text that should get truncated " +
+				"so truncate this already please yes thank you blah blah blah blah blah blah " +
+				"plus some more text",
+			ActionLocKey: "act-loc-key",
+			LocKey:       "loc-key",
+			LocArgs:      []string{"arg1", "arg2"},
+			LaunchImage:  "launch.png",
+		},
 	}
 
 	payloadSize := 256
@@ -374,12 +382,14 @@ func TestAlertBodyMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T)
 	}
 
 	p := Payload{
-		AlertText:        "Testing this payload",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body:        "Testing this payload",
+			LaunchImage: "launch.png",
+		},
 	}
 
 	payloadSize := 256
@@ -456,14 +466,16 @@ func BenchmarkAlertBodyMarshalTruncate256WithCustomFields(b *testing.B) {
 	}
 
 	p := Payload{
-		AlertText: "Testing this payload with a bunch of text that should get truncated " +
-			"so truncate this already please yes thank you blah blah blah blah blah blah " +
-			"plus some more text",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body: "Testing this payload with a bunch of text that should get truncated " +
+				"so truncate this already please yes thank you blah blah blah blah blah blah " +
+				"plus some more text",
+			LaunchImage: "launch.png",
+		},
 	}
 
 	b.ResetTimer()
@@ -484,14 +496,19 @@ func BenchmarkAlertBodyMarshalTruncate1024WithCustomFields(b *testing.B) {
 	}
 
 	p := Payload{
-		AlertText: "Testing this payload with a bunch of text that should get truncated " +
-			"so truncate this already please yes thank you blah blah blah blah blah blah " +
-			"plus some more text",
 		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
-		LaunchImage:      "launch.png",
+		AlertBody: APSAlertBody{
+			Body: "Testing this payload with a bunch of text that should get truncated " +
+				"so truncate this already please yes thank you blah blah blah blah blah blah " +
+				"plus some more text",
+			ActionLocKey: "act-loc-key",
+			LocKey:       "loc-key",
+			LocArgs:      []string{"arg1", "arg2"},
+			LaunchImage:  "launch.png",
+		},
 	}
 
 	b.ResetTimer()

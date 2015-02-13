@@ -8,40 +8,53 @@ import (
 
 //Object describing a push notification payload
 type Payload struct {
-	ActionLocKey string
-	//alert text, may be truncated if bigger than max payload size
-	AlertText string
-	// Number to set the badge number to of the app icon
+	// Basic alert structure
+	AlertText        string
 	Badge            BadgeNumber
-	Category         string
+	Sound            string
 	ContentAvailable int
-	//any custom fields to be added to the apns payload
+	Category         string
+
+	// If this is an enhanced message, use
+	// an APSAlertBody instead of .Alert
+	AlertBody APSAlertBody
+
+	// Any custom fields to be added to the apns payload
+	// These exist outside of the `aps` namespace
 	CustomFields map[string]interface{}
-	//unix time in seconds when the payload is invalid
+
+	// Payload server fields
+	// UNIX time in seconds when the payload is invalid
 	ExpirationTime uint32
-	LaunchImage    string
-	LocArgs        []string
-	LocKey         string
-	//must be either 5 or 10, if not one of these two values will default to 5
+	// Must be either 5 or 10, if not one of these two values will default to 5
 	Priority uint8
-	Sound    string
-	//push token, should contain no spaces
+
+	// Device push token, should contain no spaces
 	Token string
-	//any extra data to be associated with this payload,
-	//will not be sent to apple but will be held onto for error cases
+
+	// Any extra data to be associated with this payload,
+	// Will not be sent to apple but will be held onto for error cases
 	ExtraData interface{}
 }
 
-type apsAlertBody struct {
-	Body         string   `json:"body,omitempty"`
+type APSAlertBody struct {
+	// Text of the alert
+	Body string `json:"body,omitempty"`
+
+	// Other alert options
 	ActionLocKey string   `json:"action-loc-key,omitempty"`
 	LocKey       string   `json:"loc-key,omitempty"`
 	LocArgs      []string `json:"loc-args,omitempty"`
 	LaunchImage  string   `json:"launch-image,omitempty"`
+
+	// New Title fields and localizations. >= iOS 8.2
+	Title        string   `json:"title,omitempty"`
+	TitleLocKey  string   `json:"title-loc-key,omitempty"`
+	TitleLocArgs []string `json:"title-loc-args,omitempty"`
 }
 
 type alertBodyAps struct {
-	Alert            apsAlertBody
+	Alert            APSAlertBody
 	Badge            BadgeNumber
 	Sound            string
 	Category         string
@@ -56,10 +69,10 @@ type simpleAps struct {
 	ContentAvailable int
 }
 
-//Convert a Payload into a json object and then converted to a byte array
-//If the number of converted bytes is greater than the maxPayloadSize
-//an attempt will be made to truncate the AlertText
-//If this cannot be done, then an error will be returned
+// Convert a Payload into a json object and then converted to a byte array
+// If the number of converted bytes is greater than the maxPayloadSize
+// an attempt will be made to truncate the AlertText
+// If this cannot be done, then an error will be returned
 func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
 	if p.isSimple() {
 		return p.marshalSimplePayload(maxPayloadSize)
@@ -70,8 +83,7 @@ func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
 
 //Whether or not to use simple aps format or not
 func (p *Payload) isSimple() bool {
-	return p.ActionLocKey == "" && p.LocKey == "" &&
-		p.LocArgs == nil && p.LaunchImage == ""
+	return p.AlertText != ""
 }
 
 //Helper method to generate a json compatible map with aps key + custom fields
@@ -139,17 +151,9 @@ func (p *Payload) marshalSimplePayload(maxPayloadSize int) ([]byte, error) {
 func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 	var jsonStr []byte
 
-	//use alertBody payload
-	alertBody := apsAlertBody{
-		Body:         p.AlertText,
-		ActionLocKey: p.ActionLocKey,
-		LocKey:       p.LocKey,
-		LocArgs:      p.LocArgs,
-		LaunchImage:  p.LaunchImage,
-	}
-
+	// Use APSAlertBody payload
 	aps := alertBodyAps{
-		Alert:            alertBody,
+		Alert:            p.AlertBody,
 		Badge:            p.Badge,
 		Sound:            p.Sound,
 		Category:         p.Category,
@@ -170,7 +174,7 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 
 	if payloadLen > maxPayloadSize {
 		clipSize := payloadLen - (maxPayloadSize) + 3 //need extra characters for ellipse
-		if clipSize > len(p.AlertText) {
+		if clipSize > len(p.AlertBody.Body) {
 			return nil, errors.New(fmt.Sprintf("Payload was too long to successfully marshall to less than %v", maxPayloadSize))
 		}
 		aps.Alert.Body = aps.Alert.Body[:len(aps.Alert.Body)-clipSize] + "..."
