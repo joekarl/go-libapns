@@ -21,7 +21,7 @@ type APNSConfig struct {
 	InFlightPayloadBufferSize int
 	//number of milliseconds between frame flushes, defaults to 10
 	FramingTimeout int
-	//max number of bytes allowed in payload, defaults to 256
+	//max number of bytes allowed in payload, defaults to 2048
 	MaxPayloadSize int
 	//bytes for cert.pem : required
 	CertificateBytes []byte
@@ -127,7 +127,7 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 		errorStrs += "Invalid InFlightPayloadBufferSize. Should be > 0 (and probably around 10000)\n"
 	}
 	if config.MaxOutboundTCPFrameSize < 0 || config.MaxOutboundTCPFrameSize > TCP_FRAME_MAX {
-		errorStrs += "Invalid MaxOutboundTCPFrameSize. Should be between 0 and TCP_FRAME_MAX (and probably above 256)\n"
+		errorStrs += "Invalid MaxOutboundTCPFrameSize. Should be between 0 and TCP_FRAME_MAX (and probably above 2048)\n"
 	}
 	if config.MaxPayloadSize < 0 {
 		errorStrs += "Invalid MaxPayloadSize. Should be greater than 0.\n"
@@ -153,7 +153,7 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 		config.GatewayHost = "gateway.push.apple.com"
 	}
 	if config.MaxPayloadSize == 0 {
-		config.MaxPayloadSize = 256
+		config.MaxPayloadSize = 2048
 	}
 	if config.TlsTimeout == 0 {
 		config.TlsTimeout = 5

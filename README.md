@@ -81,7 +81,10 @@ Apple specifies that you should connect to the feedback service gateway regularl
 
 
 ##Push Notification Length
-Apple places a strict limit on push notification length (currently at 256 bytes). go-libapns will attempt to fit your push notification into that size limit by first applying all of your supplied custom fields and applying as much of your alert text as possible. This truncation is not without cost as it takes almost twice the time to fix a message that is too long. So if possible, try to find a sweet spot that won't cause truncation to occur. If unable to truncate the message, go-libapns will close it's connection to the APNS gateway (you've been warned). This limit is configurable in the APNSConfig object.
+Apple places a strict limit on push notification length (currently at 2048 bytes). go-libapns will attempt to fit your push notification into that size limit by first applying all of your supplied custom fields and applying as much of your alert text as possible. This truncation is not without cost as it takes almost twice the time to fix a message that is too long. So if possible, try to find a sweet spot that won't cause truncation to occur. If unable to truncate the message, go-libapns will close it's connection to the APNS gateway (you've been warned). This limit is configurable in the APNSConfig object.
+
+_Note: Prior to iOS 8, the limit was 256 bytes. APNS will accept and deliver up to 2048 bytes to devices 
+running iOS 8 as well as those running on older versions of iOS._
 
 ##TCP Framing
 Most APNS libraries rely on the OS Nagling to buffer data into the socket. go-libapns does not rely on Nagling but does do what it can to optimize the number of bytes sent per TCP frame. The two relevant config options that control this behavior are:
@@ -101,7 +104,7 @@ The other fields all have sane defaults
 ```go
 InFlightPayloadBufferSize       int                     //number of payloads to keep for error purposes, defaults to 10000
 FramingTimeout                  int                     //number of milliseconds between frame flushes, defaults to 10ms
-MaxPayloadSize                  int                     //max number of bytes allowed in payload, defaults to 256
+MaxPayloadSize                  int                     //max number of bytes allowed in payload, defaults to 2048
 CertificateBytes                []byte                  //bytes for cert.pem : required
 KeyBytes                        []byte                  //bytes for key.pem : required
 GatewayHost                     string                  //apple gateway, defaults to "gateway.push.apple.com"

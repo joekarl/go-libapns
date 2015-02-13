@@ -57,7 +57,7 @@ func TestConnectionShouldCloseOnWriteError(t *testing.T) {
 			InFlightPayloadBufferSize: 10000,
 			FramingTimeout:            10,
 			MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
-			MaxPayloadSize:            256,
+			MaxPayloadSize:            2048,
 		})
 
 	payload := &Payload{
@@ -127,7 +127,7 @@ func TestConnectionShouldCloseOnReadError(t *testing.T) {
 				InFlightPayloadBufferSize: 10000,
 				FramingTimeout:            10,
 				MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
-				MaxPayloadSize:            256,
+				MaxPayloadSize:            2048,
 			})
 
 		for {
@@ -204,7 +204,7 @@ func TestConnectionShouldCloseOnAppleResponse(t *testing.T) {
 			InFlightPayloadBufferSize: 10000,
 			FramingTimeout:            10,
 			MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
-			MaxPayloadSize:            256,
+			MaxPayloadSize:            2048,
 		})
 
 	token := "4ec500020d8350072d2417ba566feda10b2b266558371a65ba67fede21393c8f"
@@ -316,7 +316,7 @@ func TestConnectionShouldCloseAndReturnUnsentOnAppleResponse(t *testing.T) {
 				InFlightPayloadBufferSize: 10000,
 				FramingTimeout:            10,
 				MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
-				MaxPayloadSize:            256,
+				MaxPayloadSize:            2048,
 			})
 
 		for {
@@ -466,7 +466,7 @@ func TestConnectionShouldCloseAndReturnUnsentUpToBufferSizeOnAppleResponse(t *te
 				InFlightPayloadBufferSize: 1,
 				FramingTimeout:            10,
 				MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
-				MaxPayloadSize:            256,
+				MaxPayloadSize:            2048,
 			})
 
 		for {
