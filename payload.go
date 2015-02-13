@@ -17,7 +17,7 @@ type Payload struct {
 	//if set to 0 will not send a badge number
 	//if set to > 0 will set the badge number
 	//if set to < 0 will clear the current badge number
-	Badge            int
+	Badge            BadgeNumber
 	Category         string
 	ContentAvailable int
 	//any custom fields to be added to the apns payload
@@ -46,19 +46,19 @@ type apsAlertBody struct {
 }
 
 type alertBodyAps struct {
-	Alert            apsAlertBody `json:"alert,omitempty"`
-	Badge            int          `json:"badge,omitempty"`
-	Sound            string       `json:"sound,omitempty"`
-	Category         string       `json:"category,omitempty"`
-	ContentAvailable int          `json:"content-available,omitempty"`
+	Alert            apsAlertBody
+	Badge            BadgeNumber
+	Sound            string
+	Category         string
+	ContentAvailable int
 }
 
 type simpleAps struct {
-	Alert            string `json:"alert,omitempty"`
-	Badge            int    `json:"badge,omitempty"`
-	Sound            string `json:"sound,omitempty"`
-	Category         string `json:"category,omitempty"`
-	ContentAvailable int    `json:"content-available,omitempty"`
+	Alert            string
+	Badge            BadgeNumber
+	Sound            string
+	Category         string
+	ContentAvailable int
 }
 
 //Convert a Payload into a json object and then converted to a byte array
@@ -66,23 +66,6 @@ type simpleAps struct {
 //an attempt will be made to truncate the AlertText
 //If this cannot be done, then an error will be returned
 func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
-	// found in https://github.com/anachronistic/apns/blob/master/push_notification.go#L93
-	// This deserves some explanation.
-	//
-	// Setting an exported field of type int to 0
-	// triggers the omitempty behavior if you've set it.
-	// Since the badge is optional, we should omit it if
-	// it's not set. However, we want to include it if the
-	// value is 0, so there's a hack in payload.go
-	// that exploits the fact that Apple treats -1 for a
-	// badge value as though it were 0 (i.e. it clears the
-	// badge but doesn't stop the notification from going
-	// through successfully.)
-	//
-	// Still a hack though o_0
-	if p.Badge < 0 {
-		p.Badge = -1
-	}
 	if p.isSimple() {
 		return p.marshalSimplePayload(maxPayloadSize)
 	} else {
@@ -208,4 +191,46 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 	}
 
 	return jsonStr, nil
+}
+
+func (s simpleAps) MarshalJSON() ([]byte, error) {
+	toMarshal := map[string]interface{}{}
+
+	if s.Alert != "" {
+		toMarshal["alert"] = s.Alert
+	}
+	if s.Badge.IsSet() {
+		toMarshal["badge"] = s.Badge
+	}
+	if s.Sound != "" {
+		toMarshal["sound"] = s.Sound
+	}
+	if s.Category != "" {
+		toMarshal["category"] = s.Category
+	}
+	if s.ContentAvailable != 0 {
+		toMarshal["content-available"] = s.ContentAvailable
+	}
+
+	return json.Marshal(toMarshal)
+}
+
+func (a alertBodyAps) MarshalJSON() ([]byte, error) {
+	toMarshal := map[string]interface{}{}
+	toMarshal["alert"] = a.Alert
+
+	if a.Badge.IsSet() {
+		toMarshal["badge"] = a.Badge
+	}
+	if a.Sound != "" {
+		toMarshal["sound"] = a.Sound
+	}
+	if a.Category != "" {
+		toMarshal["category"] = a.Category
+	}
+	if a.ContentAvailable != 0 {
+		toMarshal["content-available"] = a.ContentAvailable
+	}
+
+	return json.Marshal(toMarshal)
 }

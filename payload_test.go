@@ -8,7 +8,7 @@ import (
 func TestSimpleMarshal(t *testing.T) {
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		Category:         "TEST_CATEGORY",
@@ -25,7 +25,7 @@ func TestSimpleMarshal(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"category\":\"TEST_CATEGORY\",\"content-available\":1,\"sound\":\"test.aiff\"}}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
@@ -34,7 +34,6 @@ func TestSimpleMarshal(t *testing.T) {
 func TestBadge0ShouldOmitBadge(t *testing.T) {
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            0,
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		Category:         "TEST_CATEGORY",
@@ -51,33 +50,7 @@ func TestBadge0ShouldOmitBadge(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
-	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
-	}
-}
-
-func TestBadgeLessThan0ShouldBadgeMinus1(t *testing.T) {
-	p := Payload{
-		AlertText:        "Testing this payload",
-		Badge:            -5,
-		ContentAvailable: 1,
-		Sound:            "test.aiff",
-		Category:         "TEST_CATEGORY",
-	}
-
-	payloadSize := 256
-
-	json, err := p.Marshal(payloadSize)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(json) > payloadSize {
-		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
-	}
-
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":-1,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"category\":\"TEST_CATEGORY\",\"content-available\":1,\"sound\":\"test.aiff\"}}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
@@ -96,7 +69,7 @@ func TestSimpleMarshalWithCustomFields(t *testing.T) {
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -113,7 +86,7 @@ func TestSimpleMarshalWithCustomFields(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1},\"arr\":[\"a\",2],\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload\",\"badge\":2,\"content-available\":1,\"sound\":\"test.aiff\"},\"arr\":[\"a\",2],\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
 	}
@@ -124,7 +97,7 @@ func TestSimpleMarshalTruncate(t *testing.T) {
 		AlertText: "Testing this payload with a really long message that should " +
 			"cause the payload to be truncated yay and stuff blah blah blah blah blah blah " +
 			"and some more text to really make this much bigger and stuff",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 	}
@@ -140,7 +113,7 @@ func TestSimpleMarshalTruncate(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload with a really long message that should cause the payload to be truncated yay and stuff blah blah blah blah blah blah and some more text to really make this much...\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload with a really long message that should cause the payload to be truncated yay and stuff blah blah blah blah blah blah and some more text to really make this much...\",\"badge\":2,\"content-available\":1,\"sound\":\"test.aiff\"}}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
 	}
@@ -161,7 +134,7 @@ func TestSimpleMarshalTruncateWithCustomFields(t *testing.T) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -179,7 +152,7 @@ func TestSimpleMarshalTruncateWithCustomFields(t *testing.T) {
 	}
 
 	expectedJson := "{\"aps\":{\"alert\":\"Testing this payload with a bunch of text that should get truncated " +
-		"so truncate this already please yes thank you...\",\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}," +
+		"so truncate this already please yes thank you...\",\"badge\":2,\"content-available\":1,\"sound\":\"test.aiff\"}," +
 		"\"arr\":[\"a\",2],\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
@@ -216,7 +189,7 @@ func TestSimpleMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T) {
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -233,7 +206,7 @@ func TestSimpleMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T) {
 func TestAlertBodyMarshal(t *testing.T) {
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Category:         "TEST_CATEGORY",
 		Sound:            "test.aiff",
@@ -254,7 +227,7 @@ func TestAlertBodyMarshal(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\",\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"category\":\"TEST_CATEGORY\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\",\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"category\":\"TEST_CATEGORY\",\"content-available\":1,\"sound\":\"test.aiff\"}}"
 	if string(json) != expectedJson {
 		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
@@ -273,7 +246,7 @@ func TestAlertBodyMarshalWithCustomFields(t *testing.T) {
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -295,11 +268,11 @@ func TestAlertBodyMarshalWithCustomFields(t *testing.T) {
 
 	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\"," +
 		"\"launch-image\":\"launch.png\"}," +
-		"\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1},\"arr\":[\"a\",2]," +
+		"\"badge\":2,\"content-available\":1,\"sound\":\"test.aiff\"},\"arr\":[\"a\",2]," +
 		"\"num\":55,\"obj\":{\"obja\":\"a\",\"objb\":\"b\"},\"str\":\"string\"}"
 
 	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
 }
 
@@ -308,7 +281,7 @@ func TestAlertBodyMarshalTruncate(t *testing.T) {
 		AlertText: "Testing this payload with a really long message that should " +
 			"cause the payload to be truncated yay and stuff blah blah blah blah blah blah " +
 			"and some more text to really make this much bigger and stuff",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		LaunchImage:      "launch.png",
@@ -325,9 +298,9 @@ func TestAlertBodyMarshalTruncate(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected payload to be less than %v but was %v", payloadSize, len(json)))
 	}
 
-	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload with a really long message that should cause the payload to be truncated yay and stuff blah blah blah blah blah blah and so...\",\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}}"
+	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this payload with a really long message that should cause the payload to be truncated yay and stuff blah blah blah blah blah blah and so...\",\"launch-image\":\"launch.png\"},\"badge\":2,\"content-available\":1,\"sound\":\"test.aiff\"}}"
 	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
 }
 
@@ -343,7 +316,7 @@ func TestAlertBodyMarshalTruncateWithCustomFields(t *testing.T) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -365,10 +338,10 @@ func TestAlertBodyMarshalTruncateWithCustomFields(t *testing.T) {
 	}
 
 	expectedJson := "{\"aps\":{\"alert\":{\"body\":\"Testing this ...\",\"action-loc-key\":\"act-loc-key\",\"loc-key\":\"loc-key\"," +
-		"\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"sound\":\"test.aiff\",\"content-available\":1}," +
+		"\"loc-args\":[\"arg1\",\"arg2\"],\"launch-image\":\"launch.png\"},\"badge\":2,\"content-available\":1,\"sound\":\"test.aiff\"}," +
 		"\"arr\":[\"a\",2],\"arr2\":[\"a\",2],\"num\":55,\"str\":\"string\"}"
 	if string(json) != expectedJson {
-		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, json))
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
 	}
 }
 
@@ -402,7 +375,7 @@ func TestAlertBodyMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T)
 
 	p := Payload{
 		AlertText:        "Testing this payload",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -432,7 +405,7 @@ func BenchmarkSimpleMarshalTruncate256WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -459,7 +432,7 @@ func BenchmarkSimpleMarshalTruncate1024WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -486,7 +459,7 @@ func BenchmarkAlertBodyMarshalTruncate256WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
@@ -514,7 +487,7 @@ func BenchmarkAlertBodyMarshalTruncate1024WithCustomFields(b *testing.B) {
 		AlertText: "Testing this payload with a bunch of text that should get truncated " +
 			"so truncate this already please yes thank you blah blah blah blah blah blah " +
 			"plus some more text",
-		Badge:            2,
+		Badge:            NewBadgeNumber(2),
 		ContentAvailable: 1,
 		Sound:            "test.aiff",
 		CustomFields:     customFields,
