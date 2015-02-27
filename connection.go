@@ -342,11 +342,11 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) error {
 	token, err := hex.DecodeString(idPayloadObj.Payload.Token)
 	if err != nil {
-		return fmt.Errorf("Error decoding token for payload %v\n", idPayloadObj.Payload)
+		return fmt.Errorf("Error decoding token for payload %+v : %v\n", idPayloadObj.Payload, err)
 	}
 	payloadBytes, err := idPayloadObj.Payload.Marshal(c.config.MaxPayloadSize)
 	if err != nil {
-		return fmt.Errorf("Error marshalling payload %v : %v\n", idPayloadObj.Payload, err)
+		return fmt.Errorf("Error marshalling payload %+v : %v\n", idPayloadObj.Payload, err)
 	}
 
 	//acquire lock to tcp buffer to do length checking, buffer writing,
