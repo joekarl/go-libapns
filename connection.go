@@ -280,7 +280,11 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 				c.inFlightPayloadBuffer.Remove(c.inFlightPayloadBuffer.Back())
 			}
 
-			c.bufferPayload(idPayloadObj)
+			err := c.bufferPayload(idPayloadObj)
+			if err != nil {
+				fmt.Print(err)
+				break
+			}
 
 			if shortTimeoutDuration > zeroTimeoutDuration {
 				//schedule short timeout
@@ -335,23 +339,20 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 
 //Write buffer payload to tcp frame buffer and flush if tcp frame buffer full
 //THREADSAFE (with regard to interaction with the frameBuffer using frameBufferLock)
-func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
-	//acquire lock to tcp buffer to do length checking, buffer writing,
-	//and potentially flush buffer
-	c.inFlightBufferLock.Lock()
-
+func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) error {
 	token, err := hex.DecodeString(idPayloadObj.Payload.Token)
 	if err != nil {
-		fmt.Printf("Failed to decode token for payload %v\n", idPayloadObj.Payload)
-		c.Disconnect()
-		return
+		return fmt.Errorf("Error decoding token for payload %v\n", idPayloadObj.Payload)
 	}
 	payloadBytes, err := idPayloadObj.Payload.Marshal(c.config.MaxPayloadSize)
 	if err != nil {
-		fmt.Printf("Failed to marshall payload %v : %v\n", idPayloadObj.Payload, err)
-		c.Disconnect()
-		return
+		return fmt.Errorf("Error marshalling payload %v : %v\n", idPayloadObj.Payload, err)
 	}
+
+	//acquire lock to tcp buffer to do length checking, buffer writing,
+	//and potentially flush buffer
+	c.inFlightBufferLock.Lock()
+	defer c.inFlightBufferLock.Unlock()
 
 	//write token
 	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, uint8(1))
@@ -394,8 +395,7 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
 
 	c.inFlightItemByteBuffer.Reset()
 
-	//unlock byte buffer when finished writing to it
-	c.inFlightBufferLock.Unlock()
+	return nil
 }
 
 //NOT THREADSAFE (need to acquire inFlightBufferLock before calling)
