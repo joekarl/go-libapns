@@ -346,7 +346,7 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) {
 		c.Disconnect()
 		return
 	}
-	payloadBytes, err := idPayloadObj.Payload.marshalAlertBodyPayload(c.config.MaxPayloadSize)
+	payloadBytes, err := idPayloadObj.Payload.Marshal(c.config.MaxPayloadSize)
 	if err != nil {
 		fmt.Printf("Failed to marshall payload %v : %v\n", idPayloadObj.Payload, err)
 		c.Disconnect()
