@@ -521,3 +521,61 @@ func TestConnectionShouldCloseAndReturnUnsentUpToBufferSizeOnAppleResponse(t *te
 
 	<-syncChan
 }
+
+func TestShouldNotWritePayloadOnBadToken(t *testing.T) {
+	socket := MockConnErrorOnWrite{
+		WrittenBytes: new(bytes.Buffer),
+		CloseChannel: make(chan bool),
+	}
+
+	apn := socketAPNSConnection(socket,
+		&APNSConfig{
+			InFlightPayloadBufferSize: 10000,
+			FramingTimeout:            10,
+			MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
+			MaxPayloadSize:            2048,
+		})
+
+	payload := &Payload{
+		AlertText: "Testing",
+		Token:     "4ec500",
+	}
+
+	apn.SendChannel <- payload
+
+	apn.Disconnect()
+
+	if socket.WrittenBytes.Len() != 0 {
+		fmt.Printf("Expected no bytes to be written but bytes were written\n")
+		t.FailNow()
+	}
+}
+
+func TestShouldNotWritePayloadIfUnableToMarshall(t *testing.T) {
+	socket := MockConnErrorOnWrite{
+		WrittenBytes: new(bytes.Buffer),
+		CloseChannel: make(chan bool),
+	}
+
+	apn := socketAPNSConnection(socket,
+		&APNSConfig{
+			InFlightPayloadBufferSize: 10000,
+			FramingTimeout:            10,
+			MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
+			MaxPayloadSize:            10,
+		})
+
+	payload := &Payload{
+		AlertText: "Testing this payload",
+		Token:     "4ec500020d8350072d2417ba566feda10b2b266558371a65ba67fede21393c8c",
+	}
+
+	apn.SendChannel <- payload
+
+	apn.Disconnect()
+
+	if socket.WrittenBytes.Len() != 0 {
+		fmt.Printf("Expected no bytes to be written but bytes were written\n")
+		t.FailNow()
+	}
+}

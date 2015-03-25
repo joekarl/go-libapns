@@ -175,7 +175,7 @@ func (p *Payload) marshalAlertBodyPayload(maxPayloadSize int) ([]byte, error) {
 	if payloadLen > maxPayloadSize {
 		clipSize := payloadLen - (maxPayloadSize) + 3 //need extra characters for ellipse
 		if clipSize > len(p.AlertBody.Body) {
-			return nil, errors.New(fmt.Sprintf("Payload was too long to successfully marshall to less than %v", maxPayloadSize))
+			return nil, errors.New(fmt.Sprintf("Payload was too long to successfully marshall %v or less bytes", maxPayloadSize))
 		}
 		aps.Alert.Body = aps.Alert.Body[:len(aps.Alert.Body)-clipSize] + "..."
 		fullPayload["aps"] = aps

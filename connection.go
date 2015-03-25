@@ -98,6 +98,8 @@ const (
 	//Number of bytes used in the Apple Notification Header
 	//command is 1 byte, frame length is 4 bytes
 	NOTIFICATION_HEADER_SIZE = 5
+	//Size of token
+	APNS_TOKEN_SIZE = 32
 )
 
 // This enumerates the response codes that Apple defines
@@ -121,10 +123,8 @@ func (e *AppleError) Error() string {
 	return e.ErrorString
 }
 
-//Create a new apns connection with supplied config
-//If invalid config an error will be returned
-//See APNSConfig object for defaults
-func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
+// Apply config defaults to given Config
+func applyConfigDefaults(config *APNSConfig) error {
 	errorStrs := ""
 
 	if config.CertificateBytes == nil || config.KeyBytes == nil {
@@ -141,7 +141,7 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	}
 
 	if errorStrs != "" {
-		return nil, errors.New(errorStrs)
+		return errors.New(errorStrs)
 	}
 
 	if config.InFlightPayloadBufferSize == 0 {
@@ -165,7 +165,54 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	if config.TlsTimeout == 0 {
 		config.TlsTimeout = 5
 	}
+	return nil
+}
 
+//Create a new apns connection with supplied config
+//If invalid config an error will be returned
+//See APNSConfig object for defaults
+func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
+	err := applyConfigDefaults(config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	tcpSocket, err := net.DialTimeout("tcp",
+		config.GatewayHost+":"+config.GatewayPort,
+		time.Duration(config.SocketTimeout)*time.Second)
+	if err != nil {
+		//failed to connect to gateway
+		return nil, err
+	}
+
+	tlsSocket, err := createTLSClient(tcpSocket, config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return socketAPNSConnection(tlsSocket, config), nil
+}
+
+//Create APNS connection from raw socket
+func SocketAPNSConnection(socket net.Conn, config *APNSConfig) (*APNSConnection, error) {
+	err := applyConfigDefaults(config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	tlsSocket, err := createTLSClient(socket, config)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return socketAPNSConnection(tlsSocket, config), nil
+}
+
+func createTLSClient(socket net.Conn, config *APNSConfig) (net.Conn, error) {
 	x509Cert, err := tls.X509KeyPair(config.CertificateBytes, config.KeyBytes)
 	if err != nil {
 		//failed to validate key pair
@@ -177,15 +224,7 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 		ServerName:   config.GatewayHost,
 	}
 
-	tcpSocket, err := net.DialTimeout("tcp",
-		config.GatewayHost+":"+config.GatewayPort,
-		time.Duration(config.SocketTimeout)*time.Second)
-	if err != nil {
-		//failed to connect to gateway
-		return nil, err
-	}
-
-	tlsSocket := tls.Client(tcpSocket, tlsConf)
+	tlsSocket := tls.Client(socket, tlsConf)
 	tlsSocket.SetDeadline(time.Now().Add(time.Duration(config.TlsTimeout) * time.Second))
 	err = tlsSocket.Handshake()
 	if err != nil {
@@ -197,13 +236,14 @@ func NewAPNSConnection(config *APNSConfig) (*APNSConnection, error) {
 	//reset the deadline so it doesn't fail subsequent writes
 	tlsSocket.SetDeadline(time.Time{})
 
-	return socketAPNSConnection(tlsSocket, config), nil
+	return tlsSocket, nil
 }
 
-//Internal create APNS connection from raw socket
 //Starts connection close and send listeners
 func socketAPNSConnection(socket net.Conn, config *APNSConfig) *APNSConnection {
+
 	c := new(APNSConnection)
+	//TODO(karl): maybe should copy the config to prevent tampering?
 	c.config = config
 	c.inFlightPayloadBuffer = list.New()
 	c.socket = socket
@@ -351,6 +391,11 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) error {
 	if err != nil {
 		return fmt.Errorf("Error decoding token for payload %+v : %v\n", idPayloadObj.Payload, err)
 	}
+
+	if len(token) != APNS_TOKEN_SIZE {
+		return fmt.Errorf("Invalid token length. Was %v bytes but should have been %v bytes\n", len(token), APNS_TOKEN_SIZE)
+	}
+
 	payloadBytes, err := idPayloadObj.Payload.Marshal(c.config.MaxPayloadSize)
 	if err != nil {
 		return fmt.Errorf("Error marshalling payload %+v : %v\n", idPayloadObj.Payload, err)
@@ -363,7 +408,7 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) error {
 
 	//write token
 	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, uint8(1))
-	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, uint16(32))
+	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, uint16(APNS_TOKEN_SIZE))
 	binary.Write(c.inFlightItemByteBuffer, binary.BigEndian, token)
 
 	//write payload
