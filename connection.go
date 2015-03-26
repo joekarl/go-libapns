@@ -117,6 +117,10 @@ var APPLE_PUSH_RESPONSES = map[uint8]string{
 	255: "UNKNOWN",
 }
 
+func (e *AppleError) Error() string {
+	return e.ErrorString
+}
+
 //Create a new apns connection with supplied config
 //If invalid config an error will be returned
 //See APNSConfig object for defaults
