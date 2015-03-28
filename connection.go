@@ -82,6 +82,10 @@ type APNSConnection struct {
 	inFlightBufferLock *sync.Mutex
 	//Stateful counter to identify payloads for replay
 	payloadIdCounter uint32
+	// Mutex to sync during disconnect
+	disconnectLock *sync.Mutex
+	// Boolean saying we're disconnecting
+	disconnecting bool
 }
 
 //Wrapper for associating an ID with a Payload object
@@ -100,6 +104,10 @@ const (
 	NOTIFICATION_HEADER_SIZE = 5
 	//Size of token
 	APNS_TOKEN_SIZE = 32
+	// client shutdown via disconnect error code
+	CONNECTION_CLOSED_DISCONNECT = 250
+	// client shutdown via unknown error code
+	CONNECTION_CLOSED_UNKNOWN = 251
 )
 
 // This enumerates the response codes that Apple defines
@@ -114,8 +122,10 @@ var APPLE_PUSH_RESPONSES = map[uint8]string{
 	6:   "INVALID_TOPIC_SIZE",
 	7:   "INVALID_PAYLOAD_SIZE",
 	8:   "INVALID_TOKEN",
-	10:  "SHUTDOWN",
+	10:  "SHUTDOWN", // apple shutdown connection
 	128: "INVALID_FRAME_ITEM_ID", //this is not documented, but ran across it in testing
+	CONNECTION_CLOSED_DISCONNECT: "CONNECTION CLOSED DISCONNECT", // client disconnect (not apple, used internally)
+	CONNECTION_CLOSED_UNKNOWN: "CONNECTION CLOSED UNKNOWN", // client unknown connection error (not apple, used internally)
 	255: "UNKNOWN",
 }
 
@@ -252,7 +262,8 @@ func socketAPNSConnection(socket net.Conn, config *APNSConfig) *APNSConnection {
 	c.inFlightFrameByteBuffer = new(bytes.Buffer)
 	c.inFlightItemByteBuffer = new(bytes.Buffer)
 	c.inFlightBufferLock = new(sync.Mutex)
-	c.payloadIdCounter = 0
+	c.disconnectLock = new(sync.Mutex)
+	c.payloadIdCounter = 1
 	errCloseChannel := make(chan *AppleError)
 
 	go c.closeListener(errCloseChannel)
@@ -264,6 +275,9 @@ func socketAPNSConnection(socket net.Conn, config *APNSConfig) *APNSConnection {
 //Disconnect from the Apns Gateway
 //Flushes any currently unsent messages before disconnecting from the socket
 func (c *APNSConnection) Disconnect() {
+	c.disconnectLock.Lock()
+	c.disconnecting = true
+	c.disconnectLock.Unlock()
 	//flush on disconnect
 	c.inFlightBufferLock.Lock()
 	c.flushBufferToSocket()
@@ -281,11 +295,21 @@ func (c *APNSConnection) closeListener(errCloseChannel chan *AppleError) {
 	buffer := make([]byte, 6, 6)
 	_, err := c.socket.Read(buffer)
 	if err != nil {
-		errCloseChannel <- &AppleError{
-			ErrorCode:   10,
-			ErrorString: err.Error(),
-			MessageID:   0,
+		c.disconnectLock.Lock()
+		if c.disconnecting {
+			errCloseChannel <- &AppleError{
+				ErrorCode:   CONNECTION_CLOSED_DISCONNECT, // closed due to disconnect
+				ErrorString: err.Error(),
+				MessageID:   0,
+			}
+		} else {
+			errCloseChannel <- &AppleError{
+				ErrorCode:   CONNECTION_CLOSED_UNKNOWN, // don't know why we closed
+				ErrorString: err.Error(),
+				MessageID:   0,
+			}
 		}
+		c.disconnectLock.Unlock()
 	} else {
 		messageId := binary.BigEndian.Uint32(buffer[2:])
 		errCloseChannel <- &AppleError{
@@ -319,7 +343,15 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 				Payload: sendPayload,
 				ID:      c.payloadIdCounter,
 			}
+
+			// increment payload id counter but don't allow
+			// 0 as valid id as it is the null value
+			// only a problem if we overflow a uint32
 			c.payloadIdCounter++
+			if c.payloadIdCounter == 0 {
+				c.payloadIdCounter = 1
+			}
+
 			c.inFlightPayloadBuffer.PushFront(idPayloadObj)
 			//check to see if we've overrun our buffer
 			//if so, remove one from the buffer
@@ -356,10 +388,13 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 		}
 	}
 
-	//gather unsent payload objs
+	// gather unsent payload objs
 	unsentPayloads := list.New()
 	var errorPayload *Payload
-	if appleError.ErrorCode != 0 {
+	// only calculate unsent payloads if messageId is not empty
+	if appleError.ErrorCode != 0 &&
+			appleError.ErrorCode != CONNECTION_CLOSED_DISCONNECT &&
+			appleError.MessageID != 0 {
 		for e := c.inFlightPayloadBuffer.Front(); e != nil; e = e.Next() {
 			idPayloadObj := e.Value.(*idPayload)
 			if idPayloadObj.ID == appleError.MessageID {
@@ -369,6 +404,12 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 			}
 			unsentPayloads.PushFront(idPayloadObj.Payload)
 		}
+	}
+
+	// clear error information if we closed the connection
+	if appleError.ErrorCode == CONNECTION_CLOSED_DISCONNECT {
+		appleError = nil
+		errorPayload = nil
 	}
 
 	//connection close channel write and close

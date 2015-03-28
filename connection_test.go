@@ -68,8 +68,8 @@ func TestConnectionShouldCloseOnWriteError(t *testing.T) {
 	apn.SendChannel <- payload
 	connectionClose := <-apn.CloseChannel
 
-	if connectionClose.Error.ErrorCode != 10 {
-		fmt.Printf("Should have received error 10 for closed socket be received %v\n", connectionClose.Error)
+	if connectionClose.Error.ErrorCode != CONNECTION_CLOSED_UNKNOWN {
+		fmt.Printf("Should have received error CONNECTION_CLOSED_UNKNOWN for closed socket but received %v\n", connectionClose.Error)
 		t.FailNow()
 	}
 }
@@ -136,8 +136,8 @@ func TestConnectionShouldCloseOnReadError(t *testing.T) {
 				apn.SendChannel <- p
 				break
 			case connectionClose := <-apn.CloseChannel:
-				if connectionClose.Error.ErrorCode != 10 {
-					fmt.Printf("Should have received error 10 for closed socket be received %v\n", connectionClose.Error)
+				if connectionClose.Error.ErrorCode != CONNECTION_CLOSED_UNKNOWN {
+					fmt.Printf("Should have received error CONNECTION_CLOSED_UNKNOWN for closed socket but received %v\n", connectionClose.Error)
 					syncChan <- true
 					t.FailNow()
 				}
@@ -171,7 +171,7 @@ func (conn MockConnErrorOnToken) Read(b []byte) (n int, err error) {
 }
 func (conn MockConnErrorOnToken) Write(b []byte) (n int, err error) {
 	conn.WrittenBytes.Write(b)
-	defer func() { conn.CloseChannel <- 0 }()
+	defer func() { conn.CloseChannel <- 1 }()
 	return len(b), nil
 }
 func (conn MockConnErrorOnToken) Close() error {
@@ -219,7 +219,7 @@ func TestConnectionShouldCloseOnAppleResponse(t *testing.T) {
 	connectionClose := <-apn.CloseChannel
 
 	if connectionClose.Error.ErrorCode != 8 {
-		fmt.Printf("Should have received error 8 for closed socket be received %v\n", connectionClose.Error)
+		fmt.Printf("Should have received error 8 for closed socket but received %v\n", connectionClose.Error)
 		t.FailNow()
 	}
 
@@ -248,7 +248,7 @@ func (conn MockConnErrorOnToken2) Read(b []byte) (n int, err error) {
 }
 func (conn MockConnErrorOnToken2) Write(b []byte) (n int, err error) {
 	conn.WrittenBytes.Write(b)
-	defer func() { conn.CloseChannel <- 1 }()
+	defer func() { conn.CloseChannel <- 2 }()
 	return len(b), nil
 }
 func (conn MockConnErrorOnToken2) Close() error {
@@ -329,7 +329,7 @@ func TestConnectionShouldCloseAndReturnUnsentOnAppleResponse(t *testing.T) {
 				break
 			case connectionClose := <-apn.CloseChannel:
 				if connectionClose.Error.ErrorCode != 8 {
-					fmt.Printf("Should have received error 8 for closed socket be received %v\n", connectionClose.Error)
+					fmt.Printf("Should have received error 8 for closed socket but received %v\n", connectionClose.Error)
 					syncChan <- true
 					t.FailNow()
 				}
@@ -479,7 +479,7 @@ func TestConnectionShouldCloseAndReturnUnsentUpToBufferSizeOnAppleResponse(t *te
 				break
 			case connectionClose := <-apn.CloseChannel:
 				if connectionClose.Error.ErrorCode != 8 {
-					fmt.Printf("Should have received error 8 for closed socket be received %v\n", connectionClose.Error)
+					fmt.Printf("Should have received error 8 for closed socket but received %v\n", connectionClose.Error)
 					syncChan <- true
 					t.FailNow()
 				}
@@ -520,6 +520,153 @@ func TestConnectionShouldCloseAndReturnUnsentUpToBufferSizeOnAppleResponse(t *te
 	}()
 
 	<-syncChan
+}
+
+type MockConnErrorOnToken4 struct {
+	WrittenBytes *bytes.Buffer
+	DisconnectChannel chan bool
+}
+
+func (conn MockConnErrorOnToken4) Read(b []byte) (n int, err error) {
+	<-conn.DisconnectChannel
+	return 0, fmt.Errorf("Connection closed")
+}
+func (conn MockConnErrorOnToken4) Write(b []byte) (n int, err error) {
+	conn.WrittenBytes.Write(b)
+	return len(b), nil
+}
+func (conn MockConnErrorOnToken4) Close() error {
+	return nil
+}
+func (conn MockConnErrorOnToken4) LocalAddr() net.Addr {
+	return nil
+}
+func (conn MockConnErrorOnToken4) RemoteAddr() net.Addr {
+	return nil
+}
+func (conn MockConnErrorOnToken4) SetDeadline(t time.Time) error {
+	return nil
+}
+func (conn MockConnErrorOnToken4) SetReadDeadline(t time.Time) error {
+	return nil
+}
+func (conn MockConnErrorOnToken4) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func TestConnectionShouldNotReturnErrorOnDisconnect(t *testing.T) {
+	socket := MockConnErrorOnToken4{
+		WrittenBytes: new(bytes.Buffer),
+		DisconnectChannel: make(chan bool),
+	}
+
+	apn := socketAPNSConnection(socket,
+		&APNSConfig{
+			InFlightPayloadBufferSize: 10000,
+			FramingTimeout:            10,
+			MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
+			MaxPayloadSize:            2048,
+		})
+
+	token := "4ec500020d8350072d2417ba566feda10b2b266558371a65ba67fede21393c8f"
+
+	payload := &Payload{
+		AlertText: "Testing",
+		Token:     token,
+	}
+
+	apn.SendChannel <- payload
+
+	apn.Disconnect()
+
+	socket.DisconnectChannel <- true
+
+	connectionClose := <-apn.CloseChannel
+
+	if connectionClose.Error != nil {
+		fmt.Printf("Should NOT have received error but received %v\n", connectionClose.Error)
+		t.FailNow()
+	}
+
+	if connectionClose.ErrorPayload != nil {
+		fmt.Printf("Should NOT have received error payload but received %v\n", connectionClose.ErrorPayload)
+		t.FailNow()
+	}
+}
+
+type MockConnErrorOnToken5 struct {
+	WrittenBytes *bytes.Buffer
+	DisconnectChannel chan bool
+}
+
+func (conn MockConnErrorOnToken5) Read(b []byte) (n int, err error) {
+	<-conn.DisconnectChannel
+	return 0, fmt.Errorf("Connection closed")
+}
+func (conn MockConnErrorOnToken5) Write(b []byte) (n int, err error) {
+	conn.WrittenBytes.Write(b)
+	return len(b), nil
+}
+func (conn MockConnErrorOnToken5) Close() error {
+	return nil
+}
+func (conn MockConnErrorOnToken5) LocalAddr() net.Addr {
+	return nil
+}
+func (conn MockConnErrorOnToken5) RemoteAddr() net.Addr {
+	return nil
+}
+func (conn MockConnErrorOnToken5) SetDeadline(t time.Time) error {
+	return nil
+}
+func (conn MockConnErrorOnToken5) SetReadDeadline(t time.Time) error {
+	return nil
+}
+func (conn MockConnErrorOnToken5) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func TestConnectionShouldReturnErrorOnRandomSocketClose(t *testing.T) {
+	socket := MockConnErrorOnToken5{
+		WrittenBytes: new(bytes.Buffer),
+		DisconnectChannel: make(chan bool),
+	}
+
+	apn := socketAPNSConnection(socket,
+		&APNSConfig{
+			InFlightPayloadBufferSize: 10000,
+			FramingTimeout:            10,
+			MaxOutboundTCPFrameSize:   TCP_FRAME_MAX,
+			MaxPayloadSize:            2048,
+		})
+
+	token := "4ec500020d8350072d2417ba566feda10b2b266558371a65ba67fede21393c8f"
+
+	payload := &Payload{
+		AlertText: "Testing",
+		Token:     token,
+	}
+
+	apn.SendChannel <- payload
+
+	socket.DisconnectChannel <- true
+
+	connectionClose := <-apn.CloseChannel
+
+	if connectionClose.Error == nil {
+		fmt.Printf("Should have received error but received %v\n", connectionClose.Error)
+		t.FailNow()
+	}
+
+	if connectionClose.Error.ErrorCode != CONNECTION_CLOSED_UNKNOWN {
+		fmt.Printf("Should have received error code CONNECTION_CLOSED_UNKNOWN but received %v\n", connectionClose.Error.ErrorCode)
+		t.FailNow()
+	}
+
+	if connectionClose.ErrorPayload != nil {
+		fmt.Printf("Should NOT have received error payload but received %v\n", connectionClose.ErrorPayload)
+		t.FailNow()
+	}
 }
 
 func TestShouldNotWritePayloadOnBadToken(t *testing.T) {
