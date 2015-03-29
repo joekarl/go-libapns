@@ -55,6 +55,21 @@ func main() {
 
 **Payload.Badge Need to Know** Apple specifies that one should set the badge key to 0 to clear the badge number. This unfortunately has the side effect of causing the go JSON serializer to omit the badge field. Luckily Apple uses negative badge numbers to clear the badge as well. So for our purposes, a badge > 0 will set the badge number, a badge < 0 will clear the badge number, and a badge == 0 will leave the badge number as is.
 
+##Creating an APNS connection
+Creating a connection consists of a couple of steps. They are:
+
+* Creating a tcp socket to Apple's servers
+* Initiating a TLS session using your Pem certs
+
+There are two ways to do this using go-libapns. They are:
+
+* NewConnection(*APNSConfig)
+* SocketAPNSConnection(net.Conn, *APNSConfig)
+
+The `NewConnection` method will validate your config, create the tcp connection, initiate a TLS session, and return a new APNSConnection. You probably will always use this way of creating a connection.
+
+If you are on a platform that needs to create a custom socket (like Google App Engine), you can use the `SocketAPNSConnection` method. This takes a `net.Conn` (should be a tcpSocket), validates your config, initializes a TLS session, and returns a new APNSConnection.
+
 ##Pem Certs
 You should provide your apns certificate as separated cert/key pem files. Currently go doesn't support password protected pem files (https://github.com/golang/go/issues/6722) so you'll need remove the password from your key pem.
 
@@ -79,11 +94,10 @@ go-libapns will use a persistant tcp connection (supplied by the user) to connec
 ##Feedback Service
 Apple specifies that you should connect to the feedback service gateway regularly to keep track of devices that no longer have your application installed. go-libapns provides a simple interface to the feedback service. Simply create a `APNSFeedbackServiceConfig` object and then call `ConnectToFeedbackService`. This will return a list of device tokens that you should keep track of and not send push notifications to again (specifically this will return a List of `*FeedbackResponse`)
 
-
 ##Push Notification Length
 Apple places a strict limit on push notification length (currently at 2048 bytes). go-libapns will attempt to fit your push notification into that size limit by first applying all of your supplied custom fields and applying as much of your alert text as possible. This truncation is not without cost as it takes almost twice the time to fix a message that is too long. So if possible, try to find a sweet spot that won't cause truncation to occur. If unable to truncate the message, go-libapns will close it's connection to the APNS gateway (you've been warned). This limit is configurable in the APNSConfig object.
 
-_Note: Prior to iOS 8, the limit was 256 bytes. APNS will accept and deliver up to 2048 bytes to devices 
+_Note: Prior to iOS 8, the limit was 256 bytes. APNS will accept and deliver up to 2048 bytes to devices
 running iOS 8 as well as those running on older versions of iOS._
 
 ##TCP Framing
