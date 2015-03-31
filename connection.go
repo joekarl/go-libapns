@@ -320,12 +320,6 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 				ID:      c.payloadIdCounter,
 			}
 			c.payloadIdCounter++
-			c.inFlightPayloadBuffer.PushFront(idPayloadObj)
-			//check to see if we've overrun our buffer
-			//if so, remove one from the buffer
-			if c.inFlightPayloadBuffer.Len() > c.config.InFlightPayloadBufferSize {
-				c.inFlightPayloadBuffer.Remove(c.inFlightPayloadBuffer.Back())
-			}
 
 			err := c.bufferPayload(idPayloadObj)
 			if err != nil {
@@ -399,6 +393,13 @@ func (c *APNSConnection) bufferPayload(idPayloadObj *idPayload) error {
 	payloadBytes, err := idPayloadObj.Payload.Marshal(c.config.MaxPayloadSize)
 	if err != nil {
 		return fmt.Errorf("Error marshalling payload %+v : %v\n", idPayloadObj.Payload, err)
+	}
+
+	c.inFlightPayloadBuffer.PushFront(idPayloadObj)
+	//check to see if we've overrun our buffer
+	//if so, remove one from the buffer
+	if c.inFlightPayloadBuffer.Len() > c.config.InFlightPayloadBufferSize {
+		c.inFlightPayloadBuffer.Remove(c.inFlightPayloadBuffer.Back())
 	}
 
 	//acquire lock to tcp buffer to do length checking, buffer writing,
