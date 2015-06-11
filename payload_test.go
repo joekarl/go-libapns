@@ -400,6 +400,24 @@ func TestAlertBodyMarshalThrowErrorIfPayloadTooBigWithCustomFields(t *testing.T)
 	}
 }
 
+func TestBadgeOnlyMarshal(t *testing.T) {
+	p := Payload{
+		Badge: NewBadgeNumber(2),
+	}
+
+	payloadSize := 256
+
+	json, err := p.Marshal(payloadSize)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expectedJson := "{\"aps\":{\"badge\":2}}"
+	if string(json) != expectedJson {
+		t.Error(fmt.Sprintf("Expected %v but got %v", expectedJson, string(json)))
+	}
+}
+
 func BenchmarkSimpleMarshalTruncate256WithCustomFields(b *testing.B) {
 	customFields := map[string]interface{}{
 		"num": 55,
