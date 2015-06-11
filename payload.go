@@ -83,7 +83,7 @@ func (p *Payload) Marshal(maxPayloadSize int) ([]byte, error) {
 
 //Whether or not to use simple aps format or not
 func (p *Payload) isSimple() bool {
-	return p.AlertText != ""
+	return p.AlertBody.Body == ""
 }
 
 //Helper method to generate a json compatible map with aps key + custom fields
