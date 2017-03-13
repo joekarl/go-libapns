@@ -5,7 +5,7 @@ APNS library for go
 
 The idea here is to be a simple low level library that will handle establishing a connection and sending push notifications via Apple's apns service with thought towards throughput and performance.
 
-Handles the latest Apple push notification guidelines at https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html
+Handles the latest Apple push notification guidelines at https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html
 
 Specifically will implement the binary framed format by batching push notifications. Each batch will be flushed either every 10ms or when a frame is full. A frame is full when the framed format cannot fit anymore data into a tcp packet (65535 bytes). Due to this framing, when finished with the apns connection, one should call Disconnect() to flush any remaining messages out the door.
 
