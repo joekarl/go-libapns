@@ -38,6 +38,8 @@ type APNSConfig struct {
 	SocketTimeout int
 	//number of seconds to wait for Tls handshake to complete before bailing, defaults to no timeout
 	TlsTimeout int
+	//sets InsecureSkipVerify on the Tls connection (only to be used for development)
+	UseInsecureSkipVerify bool
 }
 
 //Object returned on a connection close or connection error
@@ -122,10 +124,10 @@ var APPLE_PUSH_RESPONSES = map[uint8]string{
 	6:   "INVALID_TOPIC_SIZE",
 	7:   "INVALID_PAYLOAD_SIZE",
 	8:   "INVALID_TOKEN",
-	10:  "SHUTDOWN", // apple shutdown connection
+	10:  "SHUTDOWN",              // apple shutdown connection
 	128: "INVALID_FRAME_ITEM_ID", //this is not documented, but ran across it in testing
 	CONNECTION_CLOSED_DISCONNECT: "CONNECTION CLOSED DISCONNECT", // client disconnect (not apple, used internally)
-	CONNECTION_CLOSED_UNKNOWN: "CONNECTION CLOSED UNKNOWN", // client unknown connection error (not apple, used internally)
+	CONNECTION_CLOSED_UNKNOWN:    "CONNECTION CLOSED UNKNOWN",    // client unknown connection error (not apple, used internally)
 	255: "UNKNOWN",
 }
 
@@ -230,8 +232,9 @@ func createTLSClient(socket net.Conn, config *APNSConfig) (net.Conn, error) {
 	}
 
 	tlsConf := &tls.Config{
-		Certificates: []tls.Certificate{x509Cert},
-		ServerName:   config.GatewayHost,
+		Certificates:       []tls.Certificate{x509Cert},
+		ServerName:         config.GatewayHost,
+		InsecureSkipVerify: config.UseInsecureSkipVerify,
 	}
 
 	tlsSocket := tls.Client(socket, tlsConf)
@@ -387,8 +390,8 @@ func (c *APNSConnection) sendListener(errCloseChannel chan *AppleError) {
 	var errorPayload *Payload
 	// only calculate unsent payloads if messageId is not empty
 	if appleError.ErrorCode != 0 &&
-			appleError.ErrorCode != CONNECTION_CLOSED_DISCONNECT &&
-			appleError.MessageID != 0 {
+		appleError.ErrorCode != CONNECTION_CLOSED_DISCONNECT &&
+		appleError.MessageID != 0 {
 		for e := c.inFlightPayloadBuffer.Front(); e != nil; e = e.Next() {
 			idPayloadObj := e.Value.(*idPayload)
 			if idPayloadObj.ID == appleError.MessageID {
